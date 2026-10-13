@@ -4,8 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FoodCircle</title>
-  <script src="main.dart.js" defer></script>
+  <!--
+    Booting a Flutter web app needs the generated bootstrap script, which loads
+    the engine and then `main.dart.js`. The previous revision referenced
+    `main.dart.js` directly, which renders a blank page because the engine is
+    never initialised. Both files are produced by `flutter build web`.
+    Unverified: no Flutter SDK in the authoring environment.
+  -->
+  <script src="flutter_bootstrap.js" async></script>
 </head>
 <body>
+  <script>
+    // Replaced by the Flutter build with the app's loading indicator markup.
+  </script>
 </body>
 </html>
