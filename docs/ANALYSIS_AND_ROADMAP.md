@@ -45,14 +45,23 @@ to.
 |---|---|---|
 | P0.1 CI exports logs + artifacts to `ci-artifacts`, runs on `arena/**`, `workflow_dispatch` | ✅ done | run 38535122523; logs readable from the sandbox via `git fetch origin ci-artifacts` |
 | P0.2 `flutter build web` → `preview` branch, served as a live preview | ✅ done | run 38534656981 built and published `build/web`; served locally and verified asset-by-asset |
-| P0.3 `flutter build apk --debug` job | ✅ done | run 38535122523: `✓ Built build/app/outputs/flutter-apk/app-debug.apk` (229.9 s) |
+| P0.3 `flutter build apk --debug` job | ✅ done | run 38536020761: `✓ Built build/app/outputs/flutter-apk/app-debug.apk` (~230 s) |
 | P0.4 Regenerate platform scaffolding via `flutter create` | ✅ done | 64 files added; my hand-written manifest diffs against the pristine template by exactly our three intended lines |
 | P0.5 `analysis_options.yaml` + `flutter_lints` + `dart format` gate | ✅ done | first run surfaced 5 real lints and 2 unformatted files — all fixed; `dart format` is now a gate |
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
 | P0.5+ Behavioural SQL tests (Postgres service container) | ⬜ next | Phase 0.5 below |
 
-Toolchain pinned by observation (not by guesswork): **Flutter 3.47.7 stable · Dart 3.13.5**
-(revision `abaf9c52`), Android Gradle Plugin 9.1.0, Gradle 9.3.1, Kotlin 2.4.0, Java 17.
+**Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
+analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
+preview publish, debug APK, log publish. Toolchain pinned by observation (not by guesswork):
+**Flutter 3.47.7 stable · Dart 3.13.5** (revision `abaf9c52`), Android Gradle Plugin 9.1.0,
+Gradle 9.3.1, Kotlin 2.4.0, Java 17.
+
+Two bugs found by reading the logs rather than guessing, both now fixed: the APK failure was
+**not** the missing `MainActivity` but a stale `AndroidManifest.xml` with no
+`flutterEmbedding = 2` marker (Flutter 3.47 refuses the deleted v1 embedding), and
+`flutter create` never corrects a file that already exists — only the pristine `vanilla/`
+app on `ci-scaffold` reveals what the current template really looks like.
 
 ## 2. Method — how the analysis was produced
 
