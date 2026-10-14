@@ -20,8 +20,10 @@
 //     shell still mounted, index advanced) is asserted instead.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:foodcircle/app.dart';
+import 'package:foodcircle/features/feed/feed_screen.dart';
 import 'package:foodcircle/navigation/responsive_shell.dart';
 import 'package:foodcircle/screens/placeholder_screen.dart';
 
@@ -33,7 +35,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const FoodCircleApp());
+    // main.dart wraps the app in a ProviderScope; a test that skipped it would fail on the
+    // first ConsumerWidget, which is not the thing under test here.
+    await tester.pumpWidget(const ProviderScope(child: FoodCircleApp()));
     await tester.pumpAndSettle();
   }
 
@@ -54,7 +58,7 @@ void main() {
       await pumpAppAt(tester, const Size(1400, 900));
 
       expect(find.byType(FoodCircleApp), findsOneWidget);
-      expect(find.widgetWithText(PlaceholderScreen, 'Feed'), findsOneWidget);
+      expect(find.byType(FeedScreen), findsOneWidget);
     });
 
     testWidgets('desktop width renders an extended rail and no bottom bar',
@@ -91,7 +95,7 @@ void main() {
         'selecting a rail destination swaps the body but keeps the shell',
         (tester) async {
       await pumpAppAt(tester, const Size(1400, 900));
-      expect(find.widgetWithText(PlaceholderScreen, 'Feed'), findsOneWidget);
+      expect(find.byType(FeedScreen), findsOneWidget);
 
       await tester.tap(railLabel('Recipes'));
       await tester.pumpAndSettle();
@@ -115,7 +119,7 @@ void main() {
       await tester.tap(railLabel('Feed'));
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(PlaceholderScreen, 'Feed'), findsOneWidget);
+      expect(find.byType(FeedScreen), findsOneWidget);
       expect(
         tester
             .widget<NavigationRail>(find.byType(NavigationRail))

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
+import 'features/feed/feed_screen.dart';
 import 'navigation/responsive_shell.dart';
 import 'screens/placeholder_screen.dart';
 
@@ -70,8 +71,7 @@ class _FoodCircleAppState extends State<FoodCircleApp> {
               routes: [
                 GoRoute(
                   path: '/feed',
-                  builder: (context, state) =>
-                      const PlaceholderScreen(title: 'Feed'),
+                  builder: (context, state) => const FeedScreen(),
                 ),
               ],
             ),

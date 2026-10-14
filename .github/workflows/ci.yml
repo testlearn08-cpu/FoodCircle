@@ -137,14 +137,14 @@ jobs:
         run: |
           set -o pipefail
           flutter analyze 2>&1 | tee "$LOGS_DIR/analyze.log"
-      - name: dart format check
-        run: |
-          set -o pipefail
-          dart format --output=none --set-exit-if-changed . 2>&1 | tee "$LOGS_DIR/format.log"
       - name: flutter test
         run: |
           set -o pipefail
           flutter test --reporter expanded 2>&1 | tee "$LOGS_DIR/test.log"
+      - name: dart format check
+        run: |
+          set -o pipefail
+          dart format --output=none --set-exit-if-changed . 2>&1 | tee "$LOGS_DIR/format.log"
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
