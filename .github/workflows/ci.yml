@@ -88,10 +88,7 @@ jobs:
         run: |
           set -o pipefail
           flutter analyze 2>&1 | tee "$LOGS_DIR/analyze.log"
-      # Not a gate yet: the repo has never been through `dart format`, so this records the
-      # diff for a follow-up pass instead of failing the build. Flip to a gate afterwards.
-      - name: dart format check (report only)
-        continue-on-error: true
+      - name: dart format check
         run: |
           set -o pipefail
           dart format --output=none --set-exit-if-changed . 2>&1 | tee "$LOGS_DIR/format.log"

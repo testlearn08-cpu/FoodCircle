@@ -7,14 +7,16 @@ A responsive food-sharing community app — Flutter (Android / iOS / Web) on Sup
 
 Be clear about what this is today, because it is easy to misread the repo:
 
-- ✅ **Compiles and its test suite passes** — verified in CI
-  ([run 38525965333](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38525965333),
-  2026-10-14: `flutter pub get` → `flutter analyze` → `flutter test`, all green).
+- ✅ **Builds on every platform target, and its test suite passes** — in CI
+  ([run 38535122523](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38535122523)):
+  `flutter build web --release` publishes a runnable web bundle, `flutter build apk --debug`
+  produces an installable Android APK, and `analyze` + `test` + `dart format` are green.
 - ✅ Responsive navigation shell works: three top-level destinations (`/feed`, `/recipes`,
   `/profile`) with a desktop rail, tablet rail and mobile bottom bar, each with its own
   navigation stack.
 - ✅ Database schema + RLS policies are written (3 migrations).
-- ❌ **Nothing is buildable yet.** The Android/iOS/web platform scaffolding is incomplete.
+- ⚠️ **iOS scaffolding exists but has never been compiled** — that needs macOS, which CI
+  does not have.
 - ❌ **There is no product functionality.** All three screens render "Not implemented yet";
   Supabase is declared in `pubspec.yaml` but never imported; there is no auth, no data layer,
   no recipe screen.
@@ -56,7 +58,22 @@ the first time they reach a shared database they become append-only.
 | Job | What it proves |
 |---|---|
 | `SQL expectations` | The RLS policies and the `auth.users` leak guard still exist as written (python3, ~5s). |
-| `Flutter analyze + test` | The code compiles, lints are clean, and 7 widget tests pass. |
+| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean, 7 widget tests pass. |
+| `Scaffolding report` | Diffs the repo against what `flutter create` generates, and publishes a pristine reference app to `ci-scaffold`. |
+| `Build web + publish preview` | `flutter build web --release` succeeds and force-pushes the bundle to the `preview` branch. |
+| `Build debug APK` | The Android target really builds; the APK is attached to the run. |
+| `Publish logs to ci-artifacts` | Every job's output is pushed to `ci-artifacts` — the only way to read CI failures from a sandbox with no log access. |
+
+### Bot branches (never merge these)
+
+`ci-artifacts` (one commit per run: every job's logs plus `RUN.md`), `ci-scaffold`
+(`flutter create` output plus a pristine `vanilla/` template app), `preview` (the built web
+bundle). Each is force-pushed by the run that owns it.
+
+```bash
+git fetch origin ci-artifacts && git show origin/ci-artifacts:RUN.md   # what ran, what failed
+git show origin/ci-artifacts:analyze.log                              # and why
+```
 
 ## Repository layout
 
@@ -75,6 +92,6 @@ docs/ANALYSIS_AND_ROADMAP.md      current state + delivery plan
 ## Development environment note
 
 This repository is currently developed from a sandbox that has **no Flutter SDK and no network
-access to the SDK download hosts**. Dart code is therefore written blind and verified by CI. That is
-why the roadmap starts by turning CI into a build/artifact/preview server — see Phase 0 in the
-roadmap.
+access to the SDK download hosts or to Actions job logs**. Dart code is therefore written blind and
+verified by CI, which is why CI is wired to publish its own logs, its build output and a runnable
+web preview. See Phase 0 in the roadmap.

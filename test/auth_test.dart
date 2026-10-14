@@ -1,27 +1,23 @@
-/// Authorization and navigation tests for FoodCircle.
-///
-/// Status: Implemented (file). NOT EXECUTED — no Flutter SDK was available in
-/// the authoring environment (the sandbox cannot reach the SDK download hosts),
-/// so these tests have never been compiled or run. See DEVELOPMENT_STATUS.md.
-///
-/// These replace the previous placeholders, which asserted `expect(true, isTrue)`
-/// and therefore could not fail.
-///
-/// Two deliberate fragilities to avoid, neither of which can be confirmed
-/// without a compiler:
-///
-///  1. Taps go through `find.descendant(of: <nav widget>, matching: find.text(...))`
-///     rather than `find.byIcon`. Bottom navigation animates between `icon` and
-///     `activeIcon`, so an icon finder can match more than one widget and
-///     `tester.tap` fails rather than picking one.
-///
-///  2. There is no assertion that a previously visited destination is *gone*
-///     after navigating away. `StatefulShellRoute.indexedStack` keeps visited
-///     branches in the widget tree, and whether a finder skips the hidden ones
-///     depends on whether they are wrapped in `Offstage` or in
-///     `Visibility.maintain` — the latter is not skipped. Asserting absence here
-///     would be a coin flip; the meaningful behaviour (body swapped, shell still
-///     mounted, index advanced) is asserted instead.
+// Authorization and navigation tests for FoodCircle.
+//
+// These RUN: CI executes `flutter test` on every push (see .github/workflows/ci.yml and
+// docs/ANALYSIS_AND_ROADMAP.md). The earlier header claiming they had never been compiled
+// was accurate when no Flutter SDK was available to the authoring environment and is not
+// any more.
+//
+// Two deliberate fragilities to avoid:
+//
+//  1. Taps go through `find.descendant(of: <nav widget>, matching: find.text(...))`
+//     rather than `find.byIcon`. Bottom navigation animates between `icon` and `activeIcon`,
+//     so an icon finder can match more than one widget and `tester.tap` fails rather than
+//     picking one.
+//
+//  2. There is no assertion that a previously visited destination is *gone* after
+//     navigating away. `StatefulShellRoute.indexedStack` keeps visited branches in the
+//     widget tree, and whether a finder skips the hidden ones depends on whether they are
+//     wrapped in `Offstage` or in `Visibility.maintain` — the latter is not skipped.
+//     Asserting absence here would be a coin flip; the meaningful behaviour (body swapped,
+//     shell still mounted, index advanced) is asserted instead.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -105,7 +101,9 @@ void main() {
       // ...and the shell survived the navigation, with the rail following along.
       expect(find.byType(NavigationRail), findsOneWidget);
       expect(
-        tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+        tester
+            .widget<NavigationRail>(find.byType(NavigationRail))
+            .selectedIndex,
         1,
       );
     });
@@ -119,7 +117,9 @@ void main() {
 
       expect(find.widgetWithText(PlaceholderScreen, 'Feed'), findsOneWidget);
       expect(
-        tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+        tester
+            .widget<NavigationRail>(find.byType(NavigationRail))
+            .selectedIndex,
         0,
       );
     });

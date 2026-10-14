@@ -38,7 +38,7 @@ class _FoodCircleAppState extends State<FoodCircleApp> {
       routerConfig: _router,
       builder: (context, child) => ResponsiveBreakpoints.builder(
         child: child!,
-        breakpoints: [
+        breakpoints: const [
           Breakpoint(start: 0, end: kMobileMaxWidth, name: MOBILE),
           Breakpoint(
             start: kMobileMaxWidth + 1,
