@@ -9,15 +9,19 @@
 
 **Continuation update (2026-10-14): this section is now a historical baseline, not a current
 inventory.** Since the original analysis below, Phase 1a added the recipe data layer and public feed.
-This branch reconstructs Phase 1b email/password auth and Phase 1c Storage migration `005` from the
-inferred roadmap after the expected patch was unavailable. The new Dart and SQL changes remain
-unverified until this branch's CI passes.
+Phase 1b auth and Phase 1c Storage policies were reconstructed from inferred repository docs and
+verified by CI run [38560095418](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38560095418)
+(PR #5). With explicit user authorization, this branch now also has a repository-only image-upload
+adapter based strictly on the existing inferred `recipe-images` bucket contract; the adapter's
+follow-up CI run is the validation gate for that change.
 
-Current gates: no approved handoff is present; no Supabase project exists; no migration has been
-deployed; location, notifications and offline still have no schema; and Phase 2 (recipe detail,
-editor, search) remains blocked on the handoff and explicit sign-off. The repository's existing CI
-and the local Python guards are the only available verification path because Flutter/Dart are not
-installed in this sandbox.
+Current gates: no authoritative handoff is present; no Supabase project exists; no migration has
+been deployed; location, notifications and offline still have no schema; and Phase 2 (recipe detail,
+editor, search) remains blocked on the handoff and explicit sign-off. The bucket visibility, size,
+MIME allowlist and folder convention remain provisional. The upload editor/UI and its progress,
+retry, resizing and cleanup behavior are not part of this repository-only slice. The repository's
+existing CI and local Python guards are the only available verification path because Flutter/Dart
+are not installed in this sandbox.
 
 The baseline inventory and analysis that follow describe the earlier pre-Phase-1a snapshot unless
 updated in the progress table below. Do not use their old source counts or "no auth" statements as
@@ -61,8 +65,8 @@ to.
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
 | Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
 | Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
-| Phase 1b Auth (screens, session, route guard) | 🟡 implemented, pending current-branch CI | Supabase adapter + ephemeral fake, `/sign-in`, `/sign-up`, auth-state redirect refresh, sign-out; no Supabase project for end-to-end verification |
-| Phase 1c Migration 005 storage bucket + policies | 🟡 implemented; PGlite fresh/upgrade behavior checks passed, pending current-branch CI | Inferred public `recipe-images` bucket and UUID-folder write policies; not deployed and still rewritable |
+| Phase 1b Auth (screens, session, route guard) | ✅ verified in CI; included in open PR #5 | Supabase adapter + ephemeral fake, `/sign-in`, `/sign-up`, auth-state redirect refresh, sign-out; no Supabase project for end-to-end verification |
+| Phase 1c Migration 005 storage bucket + policies | ✅ policies verified in CI; repository upload adapter added as a provisional follow-up | Inferred public `recipe-images` bucket and UUID-folder write policies; upload API follows only this provisional contract; not deployed and still rewritable |
 
 **Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
 analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
@@ -298,7 +302,7 @@ behaviour tests; readable logs; a live preview URL of the running app; docs accu
   debugged through CI — twice, because the first version silently depended on whether the
   runner sends each statement in its own transaction (`psql`) or the whole file in one.
 
-### Phase 1 — Data & auth foundation (size: M–L) · 1a verified, 1b/1c awaiting CI
+### Phase 1 — Data & auth foundation (size: M–L) · 1a/1b/1c verified; upload API follow-up
 
 **Phase 1a is verified in CI:** migration `004` adds recipe metadata and converts the ingredient
 and step lists with a legacy-data upgrade test. The app has `Env`, forgiving `Recipe`/`Profile`
@@ -316,13 +320,18 @@ empty, error and refresh states.
 - `005_storage.sql` creates an inferred public `recipe-images` bucket. Reads are public; inserts,
   updates and deletes must remain under the caller's UUID folder. A 10 MiB limit and JPEG/PNG/WebP
   allowlist are provisional and must be reconciled with the handoff before deployment.
-- Static policy assertions and PostgreSQL behavior tests cover the Storage policies. Both fresh and
-  upgrade migration paths passed locally in PGlite; current-branch CI still needs to compile/analyze
-  the Dart and execute the Postgres service-container tests.
+- With explicit authorization for this provisional follow-up, `RecipeRepository.uploadImage`
+  accepts bytes plus MIME type, validates the current inferred size/format limits, derives a unique
+  object name, places it under the current Supabase auth user's folder, disables overwrite, and
+  returns the public URL. The in-memory demo refuses uploads rather than pretending to persist them.
+- Static policy assertions and PostgreSQL behavior tests verified the Storage policies in CI run
+  `38560095418`; the repository upload adapter is a follow-up change covered by the current branch's
+  CI. No Supabase project is used or created. Migration `005` has not been deployed and remains
+  rewritable.
 
-No Supabase project is used or created. Migration `005` has not been deployed and remains rewritable.
-`RecipeRepository.uploadImage` and the editor integration are intentionally not part of this slice;
-work on that app-side follow-up only after the handoff has been added and reconciled.
+No editor or recipe-screen integration, resizing, upload progress/retry, cleanup, or avatar upload is
+included. Reconcile the inferred bucket rules before deployment; keep the rest of Phase 2 behind the
+handoff review and explicit sign-off.
 
 ### Phase 2 — The actual product: Feed, Recipes, Profile (size: L)
 

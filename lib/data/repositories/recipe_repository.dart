@@ -1,4 +1,5 @@
 import '../models/recipe.dart';
+import '../models/recipe_image_upload.dart';
 
 /// Everything the UI is allowed to ask of recipes.
 ///
@@ -18,6 +19,12 @@ abstract class RecipeRepository {
 
   /// The signed-in user's own recipes, newest first.
   Future<List<Recipe>> fetchMine(String authorId, {int limit = 50});
+
+  /// Uploads a recipe image and returns its public URL for `RecipeDraft.imageUrl`.
+  ///
+  /// The current bucket name, public visibility, MIME allowlist, size limit, and user-folder path
+  /// are inferred and provisional. Reconcile them with the authoritative handoff before deploy.
+  Future<String> uploadImage(RecipeImageUpload upload);
 
   Future<Recipe> create(RecipeDraft draft);
 

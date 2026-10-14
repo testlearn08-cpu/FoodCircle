@@ -64,6 +64,12 @@ a Supabase project; once deployed, applied migrations become append-only. The Po
 uses test-only stubs for Supabase-managed `auth` and `storage` objects and exercises recipe-image
 read/write policies without creating a Supabase project.
 
+`RecipeRepository.uploadImage` is a repository-only, provisional upload path: it accepts JPEG, PNG,
+or WebP bytes up to 10 MiB, uses the current authenticated user's folder in the public
+`recipe-images` bucket, and returns the public URL. These limits and bucket rules are inferred and
+must be reconciled with the authoritative handoff before deployment. The in-memory demo refuses
+binary uploads; no recipe-editor UI is wired to the API yet.
+
 ```bash
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests/run.sh
 ```

@@ -52,6 +52,18 @@ CHECKS = [
         ),
     ),
     (
+        "recipe image uploads use an authenticated user folder and no overwrite",
+        "lib/data/repositories/supabase_recipe_repository.dart",
+        (
+            "static const String _imageBucket = 'recipe-images'",
+            "final String? userId = _client.auth.currentUser?.id",
+            "final String path = '$userId/${_newImageName(upload.extension)}'",
+            "await bucket.uploadBinary(",
+            "FileOptions(contentType: upload.contentType, upsert: false)",
+            "return bucket.getPublicUrl(path)",
+        ),
+    ),
+    (
         "the no-project path is explicitly ephemeral demo auth",
         "lib/data/repositories/in_memory_auth_repository.dart",
         (

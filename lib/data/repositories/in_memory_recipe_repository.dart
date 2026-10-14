@@ -1,5 +1,6 @@
 import '../models/profile.dart';
 import '../models/recipe.dart';
+import '../models/recipe_image_upload.dart';
 import 'recipe_repository.dart';
 
 /// The repository used when no Supabase project is configured, and by the widget tests.
@@ -9,8 +10,8 @@ import 'recipe_repository.dart';
 /// preview and the widget tests exercise the *real* feed screen rather than a stub of it.
 ///
 /// It cannot enforce the policies, because there is no database — so it deliberately implements
-/// only the read side plus create/delete for the signed-in demo user, and refuses everything
-/// else loudly rather than pretending to have permissions.
+/// only the read side plus create/delete for the signed-in demo user. Image uploads fail loudly
+/// rather than pretending binary data was persisted or returning a fabricated public URL.
 class InMemoryRecipeRepository implements RecipeRepository {
   InMemoryRecipeRepository({
     List<Recipe>? recipes,
@@ -171,6 +172,13 @@ class InMemoryRecipeRepository implements RecipeRepository {
 
     _recipes.add(recipe);
     return recipe;
+  }
+
+  @override
+  Future<String> uploadImage(RecipeImageUpload _) async {
+    throw UnsupportedError(
+      'Image uploads require a configured Supabase project; demo data is ephemeral.',
+    );
   }
 
   @override

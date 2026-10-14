@@ -26,7 +26,7 @@ that my inference is incomplete.
 | No location anywhere in the schema | — | **⚠️ `05_LOCATION_NOTIFICATIONS_AND_OFFLINE.md` exists.** If recipes or profiles carry a location, or if visibility depends on distance, then PostGIS, a coordinates column and a distance-aware policy are missing entirely. |
 | No notification inbox, preferences, delivery state or notification schema | — | **⚠️ `05_LOCATION_NOTIFICATIONS_AND_OFFLINE.md` exists.** `04` must also identify the delivery integrations before any notification schema or sender is designed. |
 | No offline cache, write outbox, conflict metadata or offline schema | — | **⚠️ `05_LOCATION_NOTIFICATIONS_AND_OFFLINE.md` exists.** Do not treat the in-memory demo repository as an offline design; wait for the handoff's offline contract. |
-| Recipe images use a public `recipe-images` Storage bucket, 10 MiB limit, JPEG/PNG/WebP allowlist, and first-folder user UUID for writes | `supabase/migrations/005_storage.sql` | **Inferred, not approved.** The bucket visibility, size/MIME limits and folder convention must be checked against `04`, `06` and `09`; no Supabase project exists and `005` is rewritable. |
+| Recipe images use a public `recipe-images` Storage bucket, 10 MiB limit, JPEG/PNG/WebP allowlist, and first-folder user UUID for writes | `supabase/migrations/005_storage.sql`, `RecipeImageUpload`, `SupabaseRecipeRepository.uploadImage` | **Inferred, not approved.** An explicitly authorized repository-only upload adapter validates the current limits, uses the authenticated user's folder and returns a public URL; the in-memory demo refuses uploads. Reconcile bucket visibility, size/MIME limits and folder convention against `04`, `06` and `09` before deployment. No project exists, `005` is rewritable, and there is no editor/UI integration. |
 
 ## 2. Authorization (settled by `03`, `06`)
 
@@ -38,9 +38,11 @@ that my inference is incomplete.
 | Signing up provisions exactly one `profiles` row via a `SECURITY DEFINER` trigger | `003` | — |
 | **`service_role` must never reach a client** | `lib/core/config/env.dart`, `tool/check_no_secrets.py` | Unlikely to be contradicted. |
 
-The previously verified suite asserted the core recipe/profile model in 21 checks; this continuation
-adds four Storage checks (25 total) and awaits current-branch CI. If the model changes, those checks
-must change with it—they are implementation tests, not an approved product specification.
+The previously verified suite asserted the core recipe/profile model in 21 checks; the Storage
+migration added four checks (25 total), all passed by CI run `38560095418`. A later repository-only
+upload adapter now follows those inferred policies and is covered by the current branch CI. If the
+model or handoff contract changes, update these implementation tests; they are not an approved
+product specification.
 
 ## 3. Screens and flows (settled by `01_PRODUCT_AND_SCREENS.md`)
 
@@ -74,7 +76,7 @@ addresses them:
 | Current state | Question for the handoff |
 |---|---|
 | CI is the only place this code is ever compiled; its logs, artifacts and web preview are published to `ci-artifacts` / `ci-scaffold` / `preview` branches (see `README.md`) | Does `08` mandate a workflow this conflicts with? |
-| Mainline CI verified 42 tests before this continuation; current branch adds auth and Storage cases but awaits CI | Does `07` define a coverage or acceptance bar that is higher? |
+| CI run `38560095418` verified auth, Storage policies and 58 Flutter tests; the repository-only upload adapter is covered by follow-up branch CI | Does `07` define a coverage or acceptance bar that is higher? |
 | No environments, no deploy target, no secrets management | `09` defines them; the `--dart-define` contract in `lib/core/config/env.dart` is the current guess. |
 | `main` is the default branch; work happens on `arena/*` | `08` may specify a different branching model. |
 
