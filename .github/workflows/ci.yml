@@ -38,6 +38,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Public repository, and a service_role key in it is a full database compromise: it bypasses
+  # every RLS policy, which is the only authorization boundary this app has. Runs first and in
+  # seconds because it is the one job whose failure should stop everything else.
+  secrets:
+    name: No credentials committed
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for committed credentials
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          python3 tool/check_no_secrets.py 2>&1 | tee "$LOGS_DIR/secrets.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-secrets
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
   # Runs with python3 only (~5s). Mirrors every assertion in test/privacy_test.dart against
   # the migration SQL, so it keeps failing if a policy is weakened or the auth.users view
   # reappears — but it proves nothing about how a policy behaves at runtime.
@@ -334,7 +358,7 @@ jobs:
   publish-logs:
     name: Publish logs to ci-artifacts
     runs-on: ubuntu-latest
-    needs: [sql-expectations, db-behaviour, flutter, scaffold, build-web, build-apk]
+    needs: [secrets, sql-expectations, db-behaviour, flutter, scaffold, build-web, build-apk]
     if: always() && github.event_name != 'pull_request'
     steps:
       - uses: actions/download-artifact@v4

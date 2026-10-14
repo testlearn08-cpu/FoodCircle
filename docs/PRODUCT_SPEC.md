@@ -1,11 +1,20 @@
-# FoodCircle — Product Spec (v0.3 draft for sign-off)
+# FoodCircle — Product Spec (INFERRED — not the handoff)
 
-> Status: **proposal, not yet approved.** Written because the referenced "v0.2 prototype /
-> development handoff" has been missing across three working sessions. Everything here is either
-> (a) already implied by the shipped schema, or (b) marked **[assumption]** and awaiting your call.
-> This document is the gate for Phase 2 of [`ANALYSIS_AND_ROADMAP.md`](ANALYSIS_AND_ROADMAP.md).
+> ## ⚠️ This is not the product spec. It is a record of what was guessed in its absence.
 >
-> Editing rule: keep it under two pages. If a screen needs a paragraph to explain, the screen is wrong.
+> Written when the referenced "v0.2 prototype / development handoff" had been missing across
+> **four** working sessions. Every line here is inferred from standard Flutter/Supabase practice,
+> the shipped schema, and the app's one-line description.
+>
+> The real handoff (documents `01`–`11`) supersedes this entirely. The moment it arrives, this file
+> is either replaced by it or corrected against it — see
+> [`handoff/RECONCILIATION.md`](handoff/RECONCILIATION.md) for the inventory of assumptions to
+> check, and note in particular that this document says **nothing about location, notifications or
+> offline behaviour**, while the handoff devotes `05_LOCATION_NOTIFICATIONS_AND_OFFLINE.md` to exactly
+> those.
+>
+> Treat the sections below as *provisional*, not as approved scope. Nothing in `lib/` should be
+> treated as evidence that any of it was agreed.
 
 ---
 
@@ -115,6 +124,9 @@ and the feed gains a "my circles" tab. Schema sketch: `circles`, `circle_members
 4. A second person can sign up on a fresh device and share a recipe with the first.
 
 ## 9. Decisions to confirm
+
+> These questions were addressed to the wrong person: the same questions are almost certainly
+> already answered in `10_DECISIONS_AND_OPEN_GATES.md`. Do not answer these here.
 
 - [ ] Circle-first framing (§1) or global-feed framing?
 - [ ] Email + password only, or also Google / Apple sign-in at v0.3?

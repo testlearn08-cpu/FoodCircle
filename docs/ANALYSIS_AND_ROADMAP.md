@@ -357,6 +357,19 @@ push notifications, payments, multi-language content, Docker-based local Supabas
 
 ---
 
+## 8a. Handoff documents
+
+The handoff (documents `01`–`11`) was provided on 2026-10-14 but **did not arrive in the
+sandbox** — see [`handoff/README.md`](handoff/README.md) for how to get it here, and note the
+numbering gap: there is no `02`.
+
+Until it arrives, everything product-facing in this repository is *inferred*.
+[`handoff/RECONCILIATION.md`](handoff/RECONCILIATION.md) is the inventory of every assumption that
+is currently baked into code, migrations or tests, mapped to the document that settles it — so the
+reconciliation is one pass rather than a re-read of the codebase. The most consequential unknowns
+are marked there, and they are large: **location, notifications and offline behaviour appear
+nowhere in the current implementation**, while the handoff devotes a document to each.
+
 ## 9. Decisions I need from you
 
 1. **Spec** — do you have the v0.2 prototype / handoff / any notes on what FoodCircle should *do*
