@@ -1,0 +1,39 @@
+name: CI
+
+# The Flutter suite in this repo has never been executed: there is no Flutter SDK
+# in the authoring environment, so `flutter analyze` and `flutter test` have never
+# run and this workflow itself has never run either. It is written so that it
+# produces *some* signal immediately (the sql-expectations job needs only
+# python3) while making clear the flutter job is expected to need fixes on its
+# first execution.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Runs with python3 only. This mirrors every assertion in
+  # test/privacy_test.dart against the migration SQL, so it passes today and
+  # keeps failing if a policy is weakened or the auth.users view reappears.
+  sql-expectations:
+    name: SQL expectations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tool/check_sql_expectations.py
+
+  flutter:
+    name: Flutter analyze + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      # Not `--fatal-infos`: lint preferences should not block the build.
+      - run: flutter analyze
+      - run: flutter test --reporter expanded
