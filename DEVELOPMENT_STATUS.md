@@ -1,5 +1,15 @@
 # FoodCircle Development Status
 
+> **⚠️ Historical document (status statements are out of date).**
+> Everything below describes the `arena/f20df4a6-foodcircle` and
+> `arena/53f9c307-foodcircle` passes (2026-10-13/14). In particular, the repeated claim that
+> **"NOTHING has been compiled" is no longer true**: CI run
+> [38525965333](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38525965333)
+> (2026-10-14, `main`) ran `flutter pub get`, `flutter analyze` and `flutter test` successfully —
+> the Dart code compiles and all 7 widget tests pass.
+> The current source of truth for state and plans is
+> [`docs/ANALYSIS_AND_ROADMAP.md`](docs/ANALYSIS_AND_ROADMAP.md).
+
 > Tracking document for `arena/f20df4a6-foodcircle`.
 
 ## Session Context

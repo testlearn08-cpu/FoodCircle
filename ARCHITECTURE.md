@@ -1,5 +1,12 @@
 # FoodCircle Architecture
 
+> **Status update (2026-10-14):** the "Unverified" caveat below applied only to the authoring
+> sandbox of the first pass. `flutter analyze` and `flutter test` have since run green in CI
+> ([run 38525965333](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38525965333)),
+> so the shared foundation, the navigation shell and the tests described here are now
+> **verified to compile and pass**. The database migrations remain unapplied and unverified.
+> See [`docs/ANALYSIS_AND_ROADMAP.md`](docs/ANALYSIS_AND_ROADMAP.md).
+
 Status: Implemented (document). Unverified — exact architecture from the v0.2
 prototype / handoff is still unavailable, and no Flutter SDK was present in the
 authoring environment, so nothing here has been compiled or run.

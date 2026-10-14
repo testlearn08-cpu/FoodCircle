@@ -1,13 +1,10 @@
-/// Privacy and authorization rules, asserted against the SQL migrations.
-///
-/// Status: Implemented (file). NOT EXECUTED — no Flutter SDK was available in
-/// the authoring environment, so these tests have never been compiled or run.
-/// See DEVELOPMENT_STATUS.md.
-///
-/// These are static assertions over the migration files, not a substitute for
-/// running the migrations against a real database: they catch a policy being
-/// weakened or deleted in review, but they cannot prove the policy behaves as
-/// written. A running Supabase instance is still required for that.
+// Privacy and authorization rules, asserted against the SQL migrations.
+//
+// These RUN in CI (python3 tool/check_sql_expectations.py mirrors them as a fast local
+// check), but they are *static* assertions over the migration text: they catch a policy
+// being weakened or deleted in review, and they cannot prove the policy behaves as written.
+// Behavioural RLS tests against a real PostgreSQL service container are Phase 0.5 of
+// docs/ANALYSIS_AND_ROADMAP.md and are what will close that gap.
 
 import 'dart:io';
 
@@ -26,7 +23,8 @@ void main() {
     String readMigration(String name) {
       final file = File('supabase/migrations/$name');
       if (!file.existsSync()) {
-        fail('Missing ${file.path} — run `flutter test` from the package root.');
+        fail(
+            'Missing ${file.path} — run `flutter test` from the package root.');
       }
       return _normalize(file.readAsStringSync());
     }
