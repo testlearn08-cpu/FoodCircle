@@ -6,8 +6,10 @@
 -- applied migration can be re-run, `recipes.author_id` is NOT NULL (the insert
 -- policy requires it to equal auth.uid()), and profiles gained the missing
 -- INSERT policy that a client needs to create its own profile row.
-
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+--
+-- `uuid-ossp` was dropped in favour of `gen_random_uuid()`, which has been in core
+-- PostgreSQL since 13: the extension bought nothing, and the suite in supabase/tests has to
+-- run on a stock Postgres (no extensions installed) to be worth anything.
 
 -- Profiles table (extends auth.users via foreign key)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -22,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- Recipes table
 CREATE TABLE IF NOT EXISTS public.recipes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,

@@ -49,7 +49,8 @@ to.
 | P0.4 Regenerate platform scaffolding via `flutter create` | ✅ done | 64 files added; my hand-written manifest diffs against the pristine template by exactly our three intended lines |
 | P0.5 `analysis_options.yaml` + `flutter_lints` + `dart format` gate | ✅ done | first run surfaced 5 real lints and 2 unformatted files — all fixed; `dart format` is now a gate |
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
-| P0.5+ Behavioural SQL tests (Postgres service container) | ⬜ next | Phase 0.5 below |
+| Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
+| Phase 1 Data & auth foundation | ⬜ next | migrations 004/005, env contract, Riverpod, repositories, auth flow |
 
 **Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
 analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
@@ -263,14 +264,27 @@ web preview can run on seed data); no PII or `service_role` key in the repo.
 **Exit criteria for Phase 0:** green CI that runs analyze + test + web build + APK build + SQL
 behaviour tests; readable logs; a live preview URL of the running app; docs accurate.
 
-### Phase 0.5 — Prove the database (size: S, runs inside CI)
+### Phase 0.5 — Prove the database ✅ (size: S, runs inside CI)
 
-- Postgres service container; create a minimal `auth` stub schema (`auth.users`, `auth.uid()` backed
-  by a GUC), apply all migrations in order, then run **behavioural** SQL tests with `SET ROLE anon` /
-  `authenticated`: anon can read public recipes, cannot read a private one, cannot insert for another
-  author, cannot update another's row; the signup trigger provisions exactly one profile row and
-  survives a duplicate-username race.
-- Keep `test/privacy_test.dart` as the fast static guard; it is no longer the *only* evidence.
+**Done, and it earned its keep on the first two runs.**
+
+- `supabase/tests/00_auth_stub.sql` recreates the Supabase-managed surface (`auth.users`,
+  `auth.uid()`, the three client roles, and the default privileges that give `anon` and
+  `authenticated` full access to `public` — so RLS really is the only thing being tested).
+- `supabase/tests/10_rls_behaviour.sql` makes 21 behavioural assertions as `anon`,
+  `authenticated` (with a JWT `sub`) and `service_role`: who can read a private recipe, who can
+  insert on whose behalf, whether updates and deletes correctly affect zero rows, whether the
+  signup trigger provisions exactly one profile, survives a duplicate username, and whether
+  account deletion cascades.
+- `supabase/tests/run.sh` applies stub → migrations → suite to any PostgreSQL. CI runs it in the
+  `db-behaviour` job; the same file also runs locally under PGlite (see below).
+- Found and fixed a real problem: the migrations required the **`uuid-ossp` extension** for a
+  UUID default that core PostgreSQL has provided since 13. Removed.
+- `test/privacy_test.dart` stays as the fast static guard; it is no longer the *only* evidence.
+- PGlite (PostgreSQL compiled to WebAssembly, published on npm) gave this sandbox a real
+  PostgreSQL to test against, so the suite was verified before it was pushed rather than
+  debugged through CI — twice, because the first version silently depended on whether the
+  runner sends each statement in its own transaction (`psql`) or the whole file in one.
 
 ### Phase 1 — Data & auth foundation (size: M–L)
 
