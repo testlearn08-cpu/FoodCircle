@@ -8,7 +8,6 @@ import 'package:foodcircle/features/auth/account_screen.dart';
 import 'package:foodcircle/features/auth/sign_in_screen.dart';
 import 'package:foodcircle/features/auth/sign_up_screen.dart';
 import 'package:foodcircle/features/feed/feed_screen.dart';
-import 'package:foodcircle/navigation/responsive_shell.dart';
 
 void main() {
   Future<void> pumpApp(WidgetTester tester) async {
