@@ -135,12 +135,25 @@ jobs:
           cp -r "$GITHUB_WORKSPACE" /tmp/gen
           rm -rf /tmp/gen/.git /tmp/gen/ci-logs
           cd /tmp/gen
+          # NOTE: `flutter create` preserves files that already exist, so anything the repo
+          # ships in a stale form (AndroidManifest.xml, web/index.html, .gitignore) is NOT
+          # corrected here. The pristine reference app below is what those are compared to.
           flutter create --platforms=android,ios,web \
             --org com.foodcircle --project-name foodcircle . \
             2>&1 | tee "$LOGS_DIR/scaffold-generate.log"
           # The default template test drives a counter app; it would fail here, so it is
           # removed before the tree is published.
           rm -f test/widget_test.dart
+          # Formatting is not a gate yet, so this is where the formatter's output is
+          # produced: the published branch carries the canonically formatted Dart files.
+          dart format . 2>&1 | tee "$LOGS_DIR/scaffold-format.log"
+      - name: Generate a pristine reference app (the current template, unmodified)
+        run: |
+          set -o pipefail
+          flutter create --platforms=android,ios,web \
+            --org com.foodcircle --project-name foodcircle /tmp/vanilla \
+            2>&1 | tee "$LOGS_DIR/scaffold-vanilla.log"
+          rm -f /tmp/vanilla/test/widget_test.dart
       - name: Report what the scaffolding adds or changes
         run: |
           cd /tmp/gen
@@ -157,6 +170,13 @@ jobs:
       - name: Publish the generated tree to the ci-scaffold branch
         run: |
           cd /tmp/gen
+          # The pristine template app is published under vanilla/ so that files the repo
+          # already ships in a stale form can be diffed against what Flutter 3.47 actually
+          # generates (see the scaffolding note above).
+          mkdir -p vanilla
+          cp -r /tmp/vanilla/android /tmp/vanilla/ios /tmp/vanilla/web \
+                /tmp/vanilla/.metadata /tmp/vanilla/analysis_options.yaml \
+                /tmp/vanilla/pubspec.yaml vanilla/
           git init -q
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
