@@ -69,7 +69,8 @@ class SupabaseRecipeRepository implements RecipeRepository {
       {for (final recipe in recipes) recipe.authorId},
     );
     return [
-      for (final recipe in recipes) recipe.copyWith(author: authors[recipe.authorId]),
+      for (final recipe in recipes)
+        recipe.copyWith(author: authors[recipe.authorId]),
     ];
   }
 

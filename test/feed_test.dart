@@ -45,7 +45,9 @@ Future<void> pumpFeed(WidgetTester tester, RecipeRepository repository) async {
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: <Override>[recipeRepositoryProvider.overrideWithValue(repository)],
+      overrides: <Override>[
+        recipeRepositoryProvider.overrideWithValue(repository)
+      ],
       child: const FoodCircleApp(),
     ),
   );
@@ -62,7 +64,8 @@ void main() {
     expect(find.textContaining('Ana'), findsWidgets);
   });
 
-  testWidgets('says it is a demo when no project is configured', (tester) async {
+  testWidgets('says it is a demo when no project is configured',
+      (tester) async {
     // The test build never passes --dart-define, so this is the unconfigured path.
     expect(Env.isConfigured, isFalse);
 
@@ -79,7 +82,8 @@ void main() {
     expect(find.byType(SingleChildScrollView), findsWidgets);
   });
 
-  testWidgets('shows the failure and offers a retry that retries', (tester) async {
+  testWidgets('shows the failure and offers a retry that retries',
+      (tester) async {
     final repository = _FailingRepository();
     await pumpFeed(tester, repository);
 
@@ -90,6 +94,7 @@ void main() {
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
 
-    expect(repository.calls, 2, reason: 'retry must re-run the provider, not just rebuild');
+    expect(repository.calls, 2,
+        reason: 'retry must re-run the provider, not just rebuild');
   });
 }

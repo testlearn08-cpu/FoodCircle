@@ -14,7 +14,9 @@ Future<void> main() async {
   if (Env.isConfigured) {
     await Supabase.initialize(
       url: Env.supabaseUrl,
-      anonKey: Env.supabaseAnonKey,
+      // The SDK renamed this parameter; the value is the same publishable/"anon" key the
+      // Supabase dashboard shows for a project.
+      publishableKey: Env.supabaseKey,
     );
   }
 

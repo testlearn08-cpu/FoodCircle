@@ -50,7 +50,7 @@ class FeedScreen extends ConsumerWidget {
 }
 
 class _RecipeList extends StatelessWidget {
-  const _RecipeList({super.key, required this.recipes});
+  const _RecipeList({required this.recipes});
 
   final List<Recipe> recipes;
 
@@ -67,7 +67,7 @@ class _RecipeList extends StatelessWidget {
 }
 
 class _RecipeTile extends StatelessWidget {
-  const _RecipeTile({super.key, required this.recipe});
+  const _RecipeTile({required this.recipe});
 
   final Recipe recipe;
 
@@ -94,13 +94,14 @@ class _RecipeTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      trailing: recipe.isPublic
-          ? null
-          : const Icon(Icons.lock_outline, size: 18),
+      trailing:
+          recipe.isPublic ? null : const Icon(Icons.lock_outline, size: 18),
       onTap: () {
         // The detail screen is Phase 2; until then, say so rather than doing nothing.
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${recipe.title} — detail screen is not built yet')),
+          SnackBar(
+              content:
+                  Text('${recipe.title} — detail screen is not built yet')),
         );
       },
     );
@@ -128,7 +129,7 @@ class _RecipeTile extends StatelessWidget {
 }
 
 class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({super.key, required this.imageUrl});
+  const _Thumbnail({required this.imageUrl});
 
   final String? imageUrl;
 
@@ -147,14 +148,16 @@ class _Thumbnail extends StatelessWidget {
         child: url == null
             ? ColoredBox(
                 color: scheme.surfaceContainerHighest,
-                child: Icon(Icons.restaurant_menu_outlined, color: scheme.onSurfaceVariant),
+                child: Icon(Icons.restaurant_menu_outlined,
+                    color: scheme.onSurfaceVariant),
               )
             : Image.network(
                 url,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => ColoredBox(
                   color: scheme.surfaceContainerHighest,
-                  child: Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
+                  child: Icon(Icons.broken_image_outlined,
+                      color: scheme.onSurfaceVariant),
                 ),
               ),
       ),
@@ -164,7 +167,6 @@ class _Thumbnail extends StatelessWidget {
 
 class _CenteredMessage extends StatelessWidget {
   const _CenteredMessage({
-    super.key,
     required this.icon,
     required this.title,
     required this.message,
@@ -219,7 +221,7 @@ class _CenteredMessage extends StatelessWidget {
 /// Says plainly that this build is not connected to anything, because a demo that looks real is
 /// worse than a demo that says it is a demo.
 class _DemoModeBanner extends StatelessWidget implements PreferredSizeWidget {
-  const _DemoModeBanner({super.key});
+  const _DemoModeBanner();
 
   @override
   Size get preferredSize => const Size.fromHeight(26);

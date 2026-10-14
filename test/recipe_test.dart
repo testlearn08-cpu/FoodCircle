@@ -13,7 +13,7 @@ import 'package:foodcircle/data/repositories/in_memory_recipe_repository.dart';
 void main() {
   group('Recipe.fromJson', () {
     test('parses a full PostgREST row', () {
-      final recipe = Recipe.fromJson(<String, dynamic>{
+      final recipe = Recipe.fromJson(const <String, dynamic>{
         'id': 'aaaaaaaa-0000-0000-0000-000000000001',
         'author_id': '11111111-1111-1111-1111-111111111111',
         'title': 'Everyday dal',
@@ -45,7 +45,7 @@ void main() {
     });
 
     test('tolerates the shapes PostgreSQL actually returns', () {
-      final recipe = Recipe.fromJson(<String, dynamic>{
+      final recipe = Recipe.fromJson(const <String, dynamic>{
         'id': '1',
         'author_id': '2',
         'title': 'Minimal',
@@ -69,8 +69,10 @@ void main() {
 
   group('Profile', () {
     test('falls back to the username when there is no display name', () {
-      const withName = Profile(id: '1', username: 'ana_cooks', displayName: 'Ana');
-      const withoutName = Profile(id: '2', username: 'dev_bakes', displayName: '   ');
+      const withName =
+          Profile(id: '1', username: 'ana_cooks', displayName: 'Ana');
+      const withoutName =
+          Profile(id: '2', username: 'dev_bakes', displayName: '   ');
       const bare = Profile(id: '3', username: 'sam');
 
       expect(withName.name, 'Ana');
@@ -108,7 +110,8 @@ void main() {
         profiles: const <Profile>[],
       );
       final visible = await anonymous.fetchFeed();
-      expect(visible.map((r) => r.title), isNot(contains('Leftover rice fritters')));
+      expect(visible.map((r) => r.title),
+          isNot(contains('Leftover rice fritters')));
     });
 
     test('fetchMine returns only that author, newest first', () async {
@@ -121,14 +124,15 @@ void main() {
 
     test('keyset pagination never repeats a recipe', () async {
       final firstPage = await repository.fetchFeed(limit: 1);
-      final secondPage =
-          await repository.fetchFeed(limit: 10, before: firstPage.single.createdAt);
+      final secondPage = await repository.fetchFeed(
+          limit: 10, before: firstPage.single.createdAt);
 
       expect(firstPage.single.id, 'demo-1');
       expect(secondPage.map((r) => r.id), isNot(contains('demo-1')));
     });
 
-    test('create refuses to write a recipe attributed to someone else', () async {
+    test('create refuses to write a recipe attributed to someone else',
+        () async {
       await expectLater(
         repository.create(
           const RecipeDraft(authorId: 'demo-dev', title: 'Not mine'),
@@ -159,7 +163,9 @@ void main() {
       expect(await repository.fetchById(created.id), isNull);
     });
 
-    test('fetchById on someone else\'s private recipe looks like it does not exist', () async {
+    test(
+        'fetchById on someone else\'s private recipe looks like it does not exist',
+        () async {
       final anonymous = InMemoryRecipeRepository(
         recipes: await repository.fetchMine('demo-ana'),
       );

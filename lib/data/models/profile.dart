@@ -29,9 +29,8 @@ class Profile {
   final String? bio;
 
   /// What to show in a list. Falls back to the unique username, which always exists.
-  String get name => displayName?.trim().isNotEmpty ?? false
-      ? displayName!.trim()
-      : username;
+  String get name =>
+      displayName?.trim().isNotEmpty ?? false ? displayName!.trim() : username;
 
   Map<String, dynamic> toUpdateJson() => {
         'display_name': displayName,

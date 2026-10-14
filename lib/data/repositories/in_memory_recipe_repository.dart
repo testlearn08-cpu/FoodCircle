@@ -17,7 +17,7 @@ class InMemoryRecipeRepository implements RecipeRepository {
     List<Profile>? profiles,
     this.currentUserId,
   })  : _recipes = [...?recipes],
-        _profiles = {...?profiles};
+        _profiles = _indexById(profiles);
 
   /// Demo data: enough shape to exercise the feed (public and private, tags, times, difficulty,
   /// missing fields) without looking like real users.
@@ -73,7 +73,12 @@ class InMemoryRecipeRepository implements RecipeRepository {
           cookMinutes: 45,
           difficulty: 'medium',
           tags: const ['baking'],
-          ingredients: const ['400 g bread flour', '1 tsp salt', '1/4 tsp yeast', '300 ml water'],
+          ingredients: const [
+            '400 g bread flour',
+            '1 tsp salt',
+            '1/4 tsp yeast',
+            '300 ml water'
+          ],
           steps: const [
             'Mix everything. It will look wrong.',
             'Leave covered for 18 hours.',
@@ -119,7 +124,8 @@ class InMemoryRecipeRepository implements RecipeRepository {
   @override
   Future<Recipe?> fetchById(String id) async {
     for (final recipe in _recipes) {
-      if (recipe.id == id && (recipe.isPublic || recipe.authorId == currentUserId)) {
+      if (recipe.id == id &&
+          (recipe.isPublic || recipe.authorId == currentUserId)) {
         return recipe;
       }
     }
@@ -128,7 +134,9 @@ class InMemoryRecipeRepository implements RecipeRepository {
 
   @override
   Future<List<Recipe>> fetchMine(String authorId, {int limit = 50}) async {
-    final mine = _recipes.where((recipe) => recipe.authorId == authorId).toList()
+    final mine = _recipes
+        .where((recipe) => recipe.authorId == authorId)
+        .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return List<Recipe>.unmodifiable(mine.take(limit));
@@ -167,6 +175,15 @@ class InMemoryRecipeRepository implements RecipeRepository {
 
   @override
   Future<void> delete(String id) async {
-    _recipes.removeWhere((recipe) => recipe.id == id && recipe.authorId == currentUserId);
+    _recipes.removeWhere(
+        (recipe) => recipe.id == id && recipe.authorId == currentUserId);
   }
+}
+
+Map<String, Profile> _indexById(List<Profile>? profiles) {
+  final Map<String, Profile> index = <String, Profile>{};
+  for (final Profile profile in profiles ?? const <Profile>[]) {
+    index[profile.id] = profile;
+  }
+  return index;
 }
