@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 /// A validated image payload for the provisional `recipe-images` Storage contract.
