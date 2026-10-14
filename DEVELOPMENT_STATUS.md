@@ -131,3 +131,18 @@ identifiers, `EXECUTE` revoked from `PUBLIC`) that provisions a profile row.
       privacy rules and authorization requirements against that spec.
 - [ ] Replace `PlaceholderScreen` bodies with the real Feed / Recipes / Profile
       screens, and wire Supabase auth.
+
+## Follow-up (unsaved from a closed session)
+- Added `.github/workflows/ci.yml`: a `sql-expectations` job (python3 only,
+  passes today) and a `flutter` job (pub get / analyze / test).
+- Revised `test/auth_test.dart`: taps now use `find.descendant(...)` rather than
+  `find.byIcon` because BottomNavigationBar animates between `icon` and
+  `activeIcon`; removed an assertion about a previously visited destination
+  being absent, since StatefulShellRoute.indexedStack keeps visited branches in
+  the tree and whether finders skip them depends on Offstage vs
+  Visibility.maintain. Added a re-select-active-destination test.
+- NOTHING has been compiled: no Flutter SDK exists here and it cannot be
+  installed (github.com, storage.googleapis.com, releases.ubuntu.com are
+  unreachable; only npm and PyPI respond).
+- The `flutter` CI job has NEVER run and is expected to need fixes on its first
+  execution. The `sql-expectations` job passes today.
