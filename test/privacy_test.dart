@@ -18,13 +18,15 @@ void main() {
   late String schema;
   late String indexesAndTriggers;
   late String authHelpers;
+  late String imageStorage;
 
   setUpAll(() {
     String readMigration(String name) {
       final file = File('supabase/migrations/$name');
       if (!file.existsSync()) {
         fail(
-            'Missing ${file.path} — run `flutter test` from the package root.');
+          'Missing ${file.path} — run `flutter test` from the package root.',
+        );
       }
       return _normalize(file.readAsStringSync());
     }
@@ -32,6 +34,7 @@ void main() {
     schema = readMigration('001_initial_schema.sql');
     indexesAndTriggers = readMigration('002_indexes_and_triggers.sql');
     authHelpers = readMigration('003_auth_helpers.sql');
+    imageStorage = readMigration('005_storage.sql');
   });
 
   group('Row Level Security is enabled', () {
@@ -172,8 +175,10 @@ void main() {
     test('the signup trigger is attached to auth.users', () {
       expect(
         authHelpers,
-        contains('after insert on auth.users for each row execute function '
-            'public.handle_new_user()'),
+        contains(
+          'after insert on auth.users for each row execute function '
+          'public.handle_new_user()',
+        ),
       );
     });
 
@@ -189,26 +194,89 @@ void main() {
     test('the author foreign key is indexed', () {
       expect(
         indexesAndTriggers,
-        contains('create index if not exists idx_recipes_author '
-            'on public.recipes(author_id)'),
+        contains(
+          'create index if not exists idx_recipes_author '
+          'on public.recipes(author_id)',
+        ),
       );
     });
 
     test('updated_at is maintained by a trigger on profiles', () {
       expect(
         indexesAndTriggers,
-        contains('create trigger update_profiles_updated_at '
-            'before update on public.profiles for each row execute function '
-            'public.update_updated_at()'),
+        contains(
+          'create trigger update_profiles_updated_at '
+          'before update on public.profiles for each row execute function '
+          'public.update_updated_at()',
+        ),
       );
     });
 
     test('updated_at is maintained by a trigger on recipes', () {
       expect(
         indexesAndTriggers,
-        contains('create trigger update_recipes_updated_at '
-            'before update on public.recipes for each row execute function '
-            'public.update_updated_at()'),
+        contains(
+          'create trigger update_recipes_updated_at '
+          'before update on public.recipes for each row execute function '
+          'public.update_updated_at()',
+        ),
+      );
+    });
+  });
+
+  group('recipe image storage policies', () {
+    test('bucket is public and limited to supported image uploads', () {
+      expect(
+        imageStorage,
+        contains(
+          "values ( 'recipe-images', 'recipe-images', true, 10485760, "
+          "array['image/jpeg', 'image/png', 'image/webp'] )",
+        ),
+      );
+    });
+
+    test('public clients can read recipe images', () {
+      expect(
+        imageStorage,
+        contains(
+          "create policy recipe_images_read_public on storage.objects "
+          "for select to public using (bucket_id = 'recipe-images')",
+        ),
+      );
+    });
+
+    test('uploads are restricted to the signed-in user folder', () {
+      expect(
+        imageStorage,
+        contains(
+          "create policy recipe_images_insert_own on storage.objects "
+          "for insert to authenticated with check ( bucket_id = 'recipe-images' "
+          'and (storage.foldername(name))[1] = (select auth.uid())::text )',
+        ),
+      );
+    });
+
+    test('updates cannot move an image outside the owner folder', () {
+      expect(
+        imageStorage,
+        contains(
+          "create policy recipe_images_update_own on storage.objects "
+          "for update to authenticated using ( bucket_id = 'recipe-images' "
+          'and (storage.foldername(name))[1] = (select auth.uid())::text ) '
+          "with check ( bucket_id = 'recipe-images' "
+          'and (storage.foldername(name))[1] = (select auth.uid())::text )',
+        ),
+      );
+    });
+
+    test('deletes are restricted to the signed-in user folder', () {
+      expect(
+        imageStorage,
+        contains(
+          "create policy recipe_images_delete_own on storage.objects "
+          "for delete to authenticated using ( bucket_id = 'recipe-images' "
+          'and (storage.foldername(name))[1] = (select auth.uid())::text )',
+        ),
       );
     });
   });

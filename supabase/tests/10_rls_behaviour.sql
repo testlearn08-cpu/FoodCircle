@@ -31,6 +31,10 @@ insert into public.recipes (id, author_id, title, is_public) values
   ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
    'Bob''s private pie', false);
 
+insert into storage.objects (bucket_id, name) values
+  ('recipe-images', '11111111-1111-1111-1111-111111111111/alice.webp'),
+  ('recipe-images', '22222222-2222-2222-2222-222222222222/bob.webp');
+
 -- ---------------------------------------------------------------------------------------------
 -- 1-8: schema-level guarantees
 -- ---------------------------------------------------------------------------------------------
@@ -500,5 +504,135 @@ begin
     raise exception 'deleting an auth user left % recipe(s)', n;
   end if;
   raise notice 'ok 21. deleting an account cascades to its profile and recipes';
+end
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- 22-25: public recipe images, with owner-scoped writes in Storage
+-- ---------------------------------------------------------------------------------------------
+
+do $$
+declare
+  is_public boolean;
+  file_limit bigint;
+  mime_types text[];
+begin
+  perform set_config('role', 'none', true);
+  select public, file_size_limit, allowed_mime_types
+    into is_public, file_limit, mime_types
+    from storage.buckets where id = 'recipe-images';
+
+  if not found or is_public is distinct from true then
+    raise exception 'recipe-images must exist as a public bucket';
+  end if;
+  if file_limit <> 10485760 then
+    raise exception 'recipe-images should have the inferred 10 MiB limit, got %', file_limit;
+  end if;
+  if mime_types <> array['image/jpeg', 'image/png', 'image/webp'] then
+    raise exception 'recipe-images should accept only the supported image MIME types, got %',
+      mime_types;
+  end if;
+  raise notice 'ok 22. the recipe-images bucket is public and restricted to supported image uploads';
+end
+$$;
+
+do $$
+declare
+  n int;
+begin
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '', true);
+
+  select count(*) into n from storage.objects where bucket_id = 'recipe-images';
+  if n <> 2 then
+    raise exception 'anon should read the 2 public recipe images, saw %', n;
+  end if;
+  raise notice 'ok 23. public clients can read images from the public recipe bucket';
+end
+$$;
+
+do $$
+declare
+  n int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    '{"sub": "11111111-1111-1111-1111-111111111111"}', true);
+
+  insert into storage.objects (bucket_id, name)
+  values ('recipe-images', '11111111-1111-1111-1111-111111111111/upload.webp');
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'an owner could not insert an image into their folder';
+  end if;
+
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '', true);
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('recipe-images', 'anonymous/unauthenticated.webp');
+    raise exception 'an anonymous client inserted a recipe image';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    '{"sub": "11111111-1111-1111-1111-111111111111"}', true);
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('recipe-images', '22222222-2222-2222-2222-222222222222/stolen.webp');
+    raise exception 'a user inserted an image into another user''s folder';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  update storage.objects
+     set name = '11111111-1111-1111-1111-111111111111/renamed.webp'
+   where bucket_id = 'recipe-images'
+     and name = '11111111-1111-1111-1111-111111111111/upload.webp';
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'an owner could not update an image in their folder';
+  end if;
+
+  begin
+    update storage.objects
+       set name = '22222222-2222-2222-2222-222222222222/moved.webp'
+     where bucket_id = 'recipe-images'
+       and name = '11111111-1111-1111-1111-111111111111/renamed.webp';
+    raise exception 'a user moved an image into another user''s folder';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  raise notice 'ok 24. authenticated users can write only within their own image folder';
+end
+$$;
+
+do $$
+declare
+  n int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    '{"sub": "11111111-1111-1111-1111-111111111111"}', true);
+
+  delete from storage.objects
+   where bucket_id = 'recipe-images'
+     and name = '22222222-2222-2222-2222-222222222222/bob.webp';
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'a user deleted % image(s) from another user''s folder', n;
+  end if;
+
+  delete from storage.objects
+   where bucket_id = 'recipe-images'
+     and name = '11111111-1111-1111-1111-111111111111/renamed.webp';
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'an owner deleted % images from their own folder, expected 1', n;
+  end if;
+  raise notice 'ok 25. authenticated users can delete only images in their own folder';
 end
 $$;

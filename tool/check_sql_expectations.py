@@ -19,6 +19,7 @@ MIGRATIONS = {
     "001_initial_schema.sql": "supabase/migrations/001_initial_schema.sql",
     "002_indexes_and_triggers.sql": "supabase/migrations/002_indexes_and_triggers.sql",
     "003_auth_helpers.sql": "supabase/migrations/003_auth_helpers.sql",
+    "005_storage.sql": "supabase/migrations/005_storage.sql",
 }
 
 
