@@ -50,7 +50,9 @@ to.
 | P0.5 `analysis_options.yaml` + `flutter_lints` + `dart format` gate | ✅ done | first run surfaced 5 real lints and 2 unformatted files — all fixed; `dart format` is now a gate |
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
 | Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
-| Phase 1 Data & auth foundation | ⬜ next | migrations 004/005, env contract, Riverpod, repositories, auth flow |
+| Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
+| Phase 1b Auth (screens, session, route guard) | ⬜ next | `/sign-in`, `/sign-up`, session persistence, `GoRouter` redirect |
+| Phase 1c Migration 005 storage bucket + policies | ⬜ | needed by the recipe editor's image upload |
 
 **Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
 analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
@@ -286,7 +288,19 @@ behaviour tests; readable logs; a live preview URL of the running app; docs accu
   debugged through CI — twice, because the first version silently depended on whether the
   runner sends each statement in its own transaction (`psql`) or the whole file in one.
 
-### Phase 1 — Data & auth foundation (size: M–L)
+### Phase 1 — Data & auth foundation (size: M–L) · in progress
+
+**Done so far (1a):** migration `004` adds image / servings / prep+cook minutes / difficulty /
+tags, converts `ingredients` and `steps` from untyped `jsonb` to `text[]`, and adds the
+constraints and indexes the feed and search need — with a new **upgrade-path** phase in
+`supabase/tests/run.sh` that seeds rows in the old shape and proves the conversion preserves
+them (commas, quotes and empty lists included). On the app side: `Env` reads the project URL and
+publishable key from `--dart-define`; `Recipe`/`Profile` models parse PostgREST rows forgivingly;
+`RecipeRepository` has a Supabase implementation and an in-memory one; Riverpod (until now a dead
+dependency) selects between them; and `/feed` is a real screen with pull-to-refresh, loading,
+empty and error states, plus a banner that says when a build is running on demo data. Because
+"no project configured" is a supported state, the CI-built web preview and the widget tests run
+the same screens that ship, with no backend and no mocks.
 
 - `004_recipes_metadata.sql`: `image_url`, `tags text[]`, `servings`, `prep_minutes`, `cook_minutes`,
   `difficulty`, `CHECK` constraints, `updated_at NOT NULL`, GIN index on tags, trigram index on title.

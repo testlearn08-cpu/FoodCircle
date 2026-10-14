@@ -17,10 +17,14 @@ Be clear about what this is today, because it is easy to misread the repo:
 - ✅ Database schema + RLS policies are written (3 migrations).
 - ⚠️ **iOS scaffolding exists but has never been compiled** — that needs macOS, which CI
   does not have.
-- ❌ **There is no product functionality.** All three screens render "Not implemented yet";
-  Supabase is declared in `pubspec.yaml` but never imported; there is no auth, no data layer,
-  no recipe screen.
-- ❌ No migration has ever been applied to a real PostgreSQL instance.
+- ✅ **The feed is real.** `/feed` reads through a repository (Supabase, or in-memory when no
+  project is configured) with pull-to-refresh and loading / empty / error states. Riverpod does
+  the wiring; `supabase_flutter` is connected and initialised when a project is configured.
+- ⚠️ **The database is verified, not deployed.** Migrations `001`–`004` are applied from empty
+  *and* as an upgrade of a populated database on every CI run, and the RLS policies are
+  exercised as `anon` / `authenticated` / `service_role`. No Supabase project exists yet.
+- ❌ **Auth is not built.** There is no sign-in, and no route guard, so `/recipes` and `/profile`
+  still render "Not implemented yet".
 
 **Read [`docs/ANALYSIS_AND_ROADMAP.md`](docs/ANALYSIS_AND_ROADMAP.md) first** — it is the current
 source of truth for state and for what happens next. `DEVELOPMENT_STATUS.md` is a historical log
@@ -34,6 +38,15 @@ Requires Flutter 3.10+ (Dart 3.0+).
 flutter pub get
 flutter analyze
 flutter test
+```
+
+With no `--dart-define` the app runs on in-memory demo data — the feed works, and an amber banner
+says so. Point it at a project to use the real thing:
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://<project>.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=<publishable / "anon" key>
 ```
 
 > The project runs today with **no configuration** — it has no Supabase connection yet. When auth
@@ -88,9 +101,12 @@ lib/
   app.dart                        MaterialApp.router + GoRouter + breakpoints
   navigation/responsive_shell.dart  rail / bottom bar from one destination list
   screens/placeholder_screen.dart   body for destinations with no real screen yet
-supabase/migrations/              001 schema · 002 indexes+triggers · 003 auth helpers
-supabase/tests/                   behavioural RLS suite + the auth stub it needs
-test/                             navigation + policy tests (run by CI)
+lib/core/                         config (--dart-define), Riverpod providers
+lib/data/                         models + repositories (Supabase and in-memory)
+lib/features/feed/                the feed screen
+supabase/migrations/              001 schema · 002 indexes+triggers · 003 auth helpers · 004 metadata
+supabase/tests/                   behavioural RLS suite, migration-upgrade test, auth stub
+test/                             42 tests: navigation, policies, models, repository, feed
 tool/check_sql_expectations.py    fast local mirror of the policy assertions
 docs/ANALYSIS_AND_ROADMAP.md      current state + delivery plan
 ```
