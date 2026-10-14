@@ -1,11 +1,27 @@
 /// Authorization and navigation tests for FoodCircle.
 ///
 /// Status: Implemented (file). NOT EXECUTED — no Flutter SDK was available in
-/// the authoring environment, so these tests have never been compiled or run.
-/// See DEVELOPMENT_STATUS.md.
+/// the authoring environment (the sandbox cannot reach the SDK download hosts),
+/// so these tests have never been compiled or run. See DEVELOPMENT_STATUS.md.
 ///
 /// These replace the previous placeholders, which asserted `expect(true, isTrue)`
 /// and therefore could not fail.
+///
+/// Two deliberate fragilities to avoid, neither of which can be confirmed
+/// without a compiler:
+///
+///  1. Taps go through `find.descendant(of: <nav widget>, matching: find.text(...))`
+///     rather than `find.byIcon`. Bottom navigation animates between `icon` and
+///     `activeIcon`, so an icon finder can match more than one widget and
+///     `tester.tap` fails rather than picking one.
+///
+///  2. There is no assertion that a previously visited destination is *gone*
+///     after navigating away. `StatefulShellRoute.indexedStack` keeps visited
+///     branches in the widget tree, and whether a finder skips the hidden ones
+///     depends on whether they are wrapped in `Offstage` or in
+///     `Visibility.maintain` — the latter is not skipped. Asserting absence here
+///     would be a coin flip; the meaningful behaviour (body swapped, shell still
+///     mounted, index advanced) is asserted instead.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +40,18 @@ void main() {
     await tester.pumpWidget(const FoodCircleApp());
     await tester.pumpAndSettle();
   }
+
+  /// A destination label inside the rail, ignoring identical body text.
+  Finder railLabel(String label) => find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text(label),
+      );
+
+  /// A destination label inside the bottom bar, ignoring identical body text.
+  Finder barLabel(String label) => find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text(label),
+      );
 
   group('FoodCircle application shell', () {
     testWidgets('builds and lands on the Feed destination', (tester) async {
@@ -60,19 +88,21 @@ void main() {
       final bar =
           tester.widget<BottomNavigationBar>(find.byType(BottomNavigationBar));
       expect(bar.items.length, kNavigationDestinations.length);
+      expect(bar.currentIndex, 0);
     });
 
-    testWidgets('selecting a rail destination swaps the body but keeps the shell',
+    testWidgets(
+        'selecting a rail destination swaps the body but keeps the shell',
         (tester) async {
       await pumpAppAt(tester, const Size(1400, 900));
       expect(find.widgetWithText(PlaceholderScreen, 'Feed'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.menu_book_outlined));
+      await tester.tap(railLabel('Recipes'));
       await tester.pumpAndSettle();
 
+      // The Recipes branch is now built and showing.
       expect(find.widgetWithText(PlaceholderScreen, 'Recipes'), findsOneWidget);
-      expect(find.widgetWithText(PlaceholderScreen, 'Feed'), findsNothing);
-      // The shell itself must survive the navigation.
+      // ...and the shell survived the navigation, with the rail following along.
       expect(find.byType(NavigationRail), findsOneWidget);
       expect(
         tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
@@ -80,11 +110,25 @@ void main() {
       );
     });
 
+    testWidgets('re-selecting the active destination is harmless',
+        (tester) async {
+      await pumpAppAt(tester, const Size(1400, 900));
+
+      await tester.tap(railLabel('Feed'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(PlaceholderScreen, 'Feed'), findsOneWidget);
+      expect(
+        tester.widget<NavigationRail>(find.byType(NavigationRail)).selectedIndex,
+        0,
+      );
+    });
+
     testWidgets('bottom navigation switches destination on mobile',
         (tester) async {
       await pumpAppAt(tester, const Size(400, 900));
 
-      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.tap(barLabel('Profile'));
       await tester.pumpAndSettle();
 
       expect(find.widgetWithText(PlaceholderScreen, 'Profile'), findsOneWidget);
@@ -94,6 +138,8 @@ void main() {
             .currentIndex,
         2,
       );
+      // Still no rail, i.e. the layout did not change under us.
+      expect(find.byType(NavigationRail), findsNothing);
     });
   });
 }
