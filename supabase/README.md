@@ -47,8 +47,12 @@ the same suite runs on PGlite, PostgreSQL compiled to WebAssembly:
 
 ```bash
 mkdir -p /tmp/pglite && cd /tmp/pglite && npm init -y && npm install @electric-sql/pglite
-cd - && node tool/run_sql_suite.mjs          # add --statements for psql-like behaviour
+cd -   # back to the repository root
+PGLITE_DIR=/tmp/pglite/node_modules node tool/run_sql_suite.mjs   # --statements for psql-like behaviour
 ```
+
+`PGLITE_DIR` keeps the install out of the repository: the script resolves the module from there,
+and falls back to an ordinary `node_modules` lookup when the variable is unset.
 
 Same migrations, same suite, same checks, in seconds. It is a development aid and is not wired
 into CI, because CI has a real `postgres:17` service container and that is strictly better. Its

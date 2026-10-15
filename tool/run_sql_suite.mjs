@@ -1,8 +1,12 @@
 // Run the database suite from a machine that has no PostgreSQL and no psql.
 //
-//   npm install --no-save @electric-sql/pglite    # in a scratch directory
-//   node tool/run_sql_suite.mjs [--statements]
+//   mkdir -p /tmp/pglite && cd /tmp/pglite && npm init -y && npm install @electric-sql/pglite
+//   PGLITE_DIR=/tmp/pglite/node_modules node tool/run_sql_suite.mjs [--statements]
 //
+// PGLITE_DIR exists so that PGlite does not have to be installed inside this repository: the
+// script resolves the module from there when it is set, and falls back to normal resolution
+// (a node_modules anywhere above this file) when it is not.
+
 // Why this exists
 // ---------------
 // The environment this repository is developed from cannot install PostgreSQL, and the CI job
@@ -22,10 +26,23 @@
 //                 would. The suite is written to give the same answer either way, so running
 //                 both is the check.
 
-import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+/** PGlite, from wherever it happens to be installed. */
+async function loadPGlite() {
+  try {
+    return await import('@electric-sql/pglite');
+  } catch (error) {
+    const dir = process.env.PGLITE_DIR;
+    if (!dir) throw error;
+    const entry = pathToFileURL(join(dir, '@electric-sql', 'pglite', 'dist', 'index.js'));
+    return await import(entry.href);
+  }
+}
+
+const { PGlite } = await loadPGlite();
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
