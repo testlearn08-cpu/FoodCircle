@@ -41,18 +41,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Pinned deliberately. The first version of this workflow used `channel: stable` like
+      # ci.yml and produced the *old* short formatting style — a different Dart reached it (the
+      # gate in ci.yml, which formats this repository as the tall style, is the authority). The
+      # version that ran is written into the bot branch's commit message, so a disagreement
+      # between this job and the gate is visible rather than silent.
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: 3.47.7
           channel: stable
           cache: true
+      - name: flutter pub get
+        run: |
+          set -o pipefail
+          # The gate in ci.yml formats after `pub get`. Matching it exactly is the point: the
+          # formatter resolves a file's language version from `.dart_tool/package_config.json`.
+          flutter pub get
       - name: dart format .
         id: format
         run: |
           set -o pipefail
+          # Flutter's own dart, resolved through the flutter the action installed, rather than
+          # whatever `dart` happens to be first on PATH.
+          DART_BIN="$(dirname "$(command -v flutter)")/dart"
+          if [ ! -x "$DART_BIN" ]; then
+            DART_BIN="$(command -v dart)"
+          fi
+          echo "PATH dart: $(command -v dart)"
+          echo "using: $DART_BIN"
+          "$DART_BIN" --version 2>&1 | tee "$RUNNER_TEMP/version.log"
           # No --set-exit-if-changed: this job exists to produce the formatted tree, and the gate
           # that refuses an unformatted one is in ci.yml.
-          dart format . 2>&1 | tee "$RUNNER_TEMP/format.log"
-          echo "summary=$(tail -n 1 "$RUNNER_TEMP/format.log")" >> "$GITHUB_OUTPUT"
+          "$DART_BIN" format . 2>&1 | tee "$RUNNER_TEMP/format.log"
+          {
+            tail -n 1 "$RUNNER_TEMP/version.log"
+            tail -n 1 "$RUNNER_TEMP/format.log"
+          } > "$RUNNER_TEMP/summary.txt"
+          {
+            echo 'summary<<FORMAT_SUMMARY'
+            cat "$RUNNER_TEMP/summary.txt"
+            echo 'FORMAT_SUMMARY'
+          } >> "$GITHUB_OUTPUT"
       - name: Publish the formatted tree to ci-formatted
         run: |
           git config user.name "github-actions[bot]"
@@ -60,7 +89,12 @@ jobs:
           # An orphan commit, like ci-artifacts: the branch is a snapshot to read, not a history.
           git checkout -q --orphan ci-formatted
           git add -A
-          git commit -q -m "formatted: ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7} — ${{ steps.format.outputs.summary }}"
+          # The formatting summary goes in the subject, the toolchain that produced it in the
+          # body: `git log -1 --format=%B FETCH_HEAD` answers both "what changed" and "formatted
+          # by what", which is the question that mattered the first time this job ran.
+          git commit -q \
+            -m "formatted: ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7} — ${{ steps.format.outputs.summary }}" \
+            -m "${{ steps.format.outputs.summary }}"
           git push -q -f \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" \
             ci-formatted

@@ -126,6 +126,7 @@ class _Body extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final String? description = recipe.description?.trim();
     final Profile? author = recipe.author;
+    final bool emptyLists = recipe.ingredients.isEmpty && recipe.steps.isEmpty;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 32),
@@ -151,13 +152,13 @@ class _Body extends StatelessWidget {
               ],
               if (recipe.ingredients.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 24),
-                _Section(title: 'Ingredients'),
+                const _Section(title: 'Ingredients'),
                 for (final ingredient in recipe.ingredients)
                   _Ingredient(text: ingredient),
               ],
               if (recipe.steps.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 24),
-                _Section(title: 'Steps'),
+                const _Section(title: 'Steps'),
                 for (final (index, step) in recipe.steps.indexed)
                   _Step(number: index + 1, text: step),
               ],

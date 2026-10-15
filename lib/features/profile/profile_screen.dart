@@ -68,9 +68,11 @@ class _ProfileBody extends ConsumerWidget {
                   'The signup trigger normally creates it.',
             )
           : RefreshIndicator(
-              onRefresh: () async {
+              // Returning the refreshed future is what the indicator waits for; returning it
+              // rather than awaiting it also keeps the value out of a throwaway local.
+              onRefresh: () {
                 ref.invalidate(profileByIdProvider(userId));
-                await ref.refresh(myRecipesProvider(userId).future);
+                return ref.refresh(myRecipesProvider(userId).future);
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
