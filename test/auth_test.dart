@@ -24,8 +24,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:foodcircle/app.dart';
 import 'package:foodcircle/features/feed/feed_screen.dart';
+import 'package:foodcircle/features/profile/profile_screen.dart';
+import 'package:foodcircle/features/recipes/my_recipes_screen.dart';
 import 'package:foodcircle/navigation/responsive_shell.dart';
-import 'package:foodcircle/screens/placeholder_screen.dart';
 
 void main() {
   /// Pumps the app at a given logical size.
@@ -101,7 +102,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The Recipes branch is now built and showing.
-      expect(find.widgetWithText(PlaceholderScreen, 'Recipes'), findsOneWidget);
+      expect(find.byType(MyRecipesScreen), findsOneWidget);
       // ...and the shell survived the navigation, with the rail following along.
       expect(find.byType(NavigationRail), findsOneWidget);
       expect(
@@ -135,7 +136,7 @@ void main() {
       await tester.tap(barLabel('Profile'));
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(PlaceholderScreen, 'Profile'), findsOneWidget);
+      expect(find.byType(ProfileScreen), findsOneWidget);
       expect(
         tester
             .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))

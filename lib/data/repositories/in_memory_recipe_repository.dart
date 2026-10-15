@@ -143,6 +143,9 @@ class InMemoryRecipeRepository implements RecipeRepository {
   }
 
   @override
+  Future<Profile?> fetchProfile(String id) async => _profiles[id];
+
+  @override
   Future<Recipe> create(RecipeDraft draft) async {
     if (currentUserId == null || draft.authorId != currentUserId) {
       throw StateError(
@@ -171,6 +174,51 @@ class InMemoryRecipeRepository implements RecipeRepository {
 
     _recipes.add(recipe);
     return recipe;
+  }
+
+  @override
+  Future<Recipe> update(String id, RecipeDraft draft) async {
+    final int index = _recipes.indexWhere((recipe) => recipe.id == id);
+    if (index == -1) {
+      throw StateError('No recipe with id $id to update.');
+    }
+
+    final Recipe existing = _recipes[index];
+    if (currentUserId == null || existing.authorId != currentUserId) {
+      throw StateError(
+        'Signed-out or not the author: the update policy would reject a write '
+        'to ${existing.authorId}\'s recipe.',
+      );
+    }
+    if (draft.authorId != existing.authorId) {
+      throw StateError(
+        'A recipe cannot change author: it was created by '
+        '${existing.authorId} and this draft claims ${draft.authorId}.',
+      );
+    }
+
+    final Recipe updated = Recipe(
+      id: existing.id,
+      authorId: existing.authorId,
+      title: draft.title,
+      createdAt: existing.createdAt,
+      description: draft.description,
+      // The editor cannot set an image yet — uploads need the storage policies in migration 005
+      // — so an edit keeps whatever image the row already had rather than dropping it.
+      imageUrl: existing.imageUrl,
+      servings: draft.servings,
+      prepMinutes: draft.prepMinutes,
+      cookMinutes: draft.cookMinutes,
+      difficulty: draft.difficulty,
+      tags: draft.tags,
+      ingredients: draft.ingredients,
+      steps: draft.steps,
+      isPublic: draft.isPublic,
+      author: _profiles[existing.authorId],
+    );
+
+    _recipes[index] = updated;
+    return updated;
   }
 
   @override

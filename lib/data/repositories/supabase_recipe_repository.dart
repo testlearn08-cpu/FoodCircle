@@ -49,10 +49,38 @@ class SupabaseRecipeRepository implements RecipeRepository {
   }
 
   @override
+  Future<Profile?> fetchProfile(String id) async {
+    final row = await _client
+        .from('profiles')
+        .select('id, username, display_name, avatar_url, bio')
+        .eq('id', id)
+        .maybeSingle();
+    return row == null ? null : Profile.fromJson(row);
+  }
+
+  @override
   Future<Recipe> create(RecipeDraft draft) async {
     final row = await _client
         .from(_table)
         .insert(draft.toInsertJson())
+        .select()
+        .single();
+    return Recipe.fromJson(row);
+  }
+
+  @override
+  Future<Recipe> update(String id, RecipeDraft draft) async {
+    final json = draft.toInsertJson()
+      // A recipe cannot change author, and the update policy rejects the attempt anyway.
+      ..remove('author_id')
+      // The editor has no image field yet (uploads need the storage policies in migration 005),
+      // so an edit must not silently drop an image the row already has.
+      ..remove('image_url');
+
+    final row = await _client
+        .from(_table)
+        .update(json)
+        .eq('id', id)
         .select()
         .single();
     return Recipe.fromJson(row);

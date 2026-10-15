@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:foodcircle/app.dart';
 import 'package:foodcircle/core/config/env.dart';
 import 'package:foodcircle/core/providers.dart';
+import 'package:foodcircle/data/models/profile.dart';
 import 'package:foodcircle/data/models/recipe.dart';
 import 'package:foodcircle/data/repositories/in_memory_recipe_repository.dart';
 import 'package:foodcircle/data/repositories/recipe_repository.dart';
@@ -31,7 +32,14 @@ class _FailingRepository implements RecipeRepository {
       throw UnimplementedError();
 
   @override
+  Future<Profile?> fetchProfile(String id) async => throw UnimplementedError();
+
+  @override
   Future<Recipe> create(RecipeDraft draft) async => throw UnimplementedError();
+
+  @override
+  Future<Recipe> update(String id, RecipeDraft draft) async =>
+      throw UnimplementedError();
 
   @override
   Future<void> delete(String id) async => throw UnimplementedError();

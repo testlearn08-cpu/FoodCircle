@@ -13,19 +13,30 @@ authoring environment, so nothing here has been compiled or run.
 
 ## Stack
 - Flutter 3.10+ (Android / iOS / Web shared foundation)
-- Supabase (PostgreSQL + Auth + Storage)
+- Supabase (PostgreSQL + Auth + Storage) — connected and initialised when a project
+  is configured; the app runs on in-memory repositories when one is not.
 - GoRouter (navigation)
-- ResponsiveFramework (breakpoints)
-- Riverpod (declared in `pubspec.yaml`; **not yet integrated**)
+- Riverpod (repositories, the feed, the recipe pages, and the session seam below)
+- No responsive-layout package: the shell measures `MediaQuery` itself against the
+  two constants in `responsive_shell.dart`. `responsive_framework` was removed after
+  its breakpoint list turned out to be both unread and wrong at the top end.
 
 ## Shared Foundation
-- `lib/main.dart` — entry point.
-- `lib/app.dart` — `MaterialApp.router`, the `GoRouter` definition, and the
-  `ResponsiveBreakpoints` configuration.
+- `lib/main.dart` — entry point; initialises Supabase when configured, then runs the
+  app inside a `ProviderScope`.
+- `lib/app.dart` — `MaterialApp.router` and the `GoRouter` definition: one
+  `StatefulShellRoute` branch per destination, with each branch owning its stack.
 - `lib/navigation/responsive_shell.dart` — responsive navigation shell plus the
-  shared destination list and layout breakpoint constants.
-- `lib/screens/placeholder_screen.dart` — body used by destinations that have no
-  real screen yet.
+  shared destination list and the two layout breakpoint constants.
+- `lib/core/config/env.dart` — the `--dart-define` contract, and whether a project was
+  configured at all.
+- `lib/core/session.dart` — who the app is acting as. Phase 1b replaces the body of
+  `currentUserIdProvider` with real auth state; the screens do not change.
+- `lib/core/widgets/` — the widgets that keep the screens consistent: a recipe list
+  with its three states, the demo-mode banner, the empty/error view, and the initials
+  avatar.
+- `lib/features/` — `feed/` (public recipes), `recipes/` (recipe page, recipe box,
+  editor), `profile/`.
 - `android/app/` — Android manifest and build config.
 - `ios/Runner/` — iOS runner assets and config placeholders.
 - `web/index.html` — web entry that boots the generated `flutter_bootstrap.js`.

@@ -1,3 +1,4 @@
+import '../models/profile.dart';
 import '../models/recipe.dart';
 
 /// Everything the UI is allowed to ask of recipes.
@@ -17,9 +18,25 @@ abstract class RecipeRepository {
   Future<Recipe?> fetchById(String id);
 
   /// The signed-in user's own recipes, newest first.
+  ///
+  /// Unlike [fetchFeed] this includes the author's private recipes: `recipes_read_public`
+  /// allows an author to read their own rows whether they are public or not.
   Future<List<Recipe>> fetchMine(String authorId, {int limit = 50});
 
+  /// A single profile. Returns null when there is no such row.
+  ///
+  /// Profiles are readable by anyone, including `anon` (`profiles_read_all`), which is what makes
+  /// an author's name and avatar available next to their recipes. Only the owner can write their
+  /// own row.
+  Future<Profile?> fetchProfile(String id);
+
   Future<Recipe> create(RecipeDraft draft);
+
+  /// Replaces an existing recipe's content.
+  ///
+  /// The author is fixed at creation: `author_id` is not part of the update, and the update
+  /// policy (`recipes_update_own`) rejects anyone but the author anyway.
+  Future<Recipe> update(String id, RecipeDraft draft);
 
   Future<void> delete(String id);
 }

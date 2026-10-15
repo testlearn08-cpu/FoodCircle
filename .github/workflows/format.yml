@@ -1,0 +1,67 @@
+name: Format
+
+# Why this workflow exists
+# ------------------------
+# `dart format --set-exit-if-changed` is a gate in ci.yml, and the environment this repository is
+# developed from has no Dart SDK and cannot install one — pub.dev and the SDK download hosts are
+# unreachable, and there is no npm or PyPI package that ships the formatter. A formatting
+# disagreement would therefore be one bit of information: format.log names the files that would
+# change and never says how.
+#
+# So CI formats the tree and publishes the result to `ci-formatted`, the same pattern
+# ci-artifacts / preview / ci-scaffold already use. From the sandbox:
+#
+#   git fetch origin ci-formatted
+#   git log -1 --format=%B FETCH_HEAD      # "Formatted 30 files (2 changed) in …"
+#   git diff FETCH_HEAD -- lib test        # exactly what the formatter would do
+#
+# Adopt the result by hand; never merge `ci-formatted`, and never build on it. The next run
+# force-pushes over it, exactly like the other bot branches.
+#
+# It runs for `arena/**` pushes because that is where the work happens; `workflow_dispatch` is the
+# manual escape hatch (it needs this file on the default branch first, so it starts out as a
+# push-only workflow).
+
+on:
+  push:
+    branches: ['arena/**']
+  workflow_dispatch:
+
+# Needed to push the bot branch.
+permissions:
+  contents: write
+
+concurrency:
+  group: format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: Publish canonical formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: dart format .
+        id: format
+        run: |
+          set -o pipefail
+          # No --set-exit-if-changed: this job exists to produce the formatted tree, and the gate
+          # that refuses an unformatted one is in ci.yml.
+          dart format . 2>&1 | tee "$RUNNER_TEMP/format.log"
+          echo "summary=$(tail -n 1 "$RUNNER_TEMP/format.log")" >> "$GITHUB_OUTPUT"
+      - name: Publish the formatted tree to ci-formatted
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # An orphan commit, like ci-artifacts: the branch is a snapshot to read, not a history.
+          git checkout -q --orphan ci-formatted
+          git add -A
+          git commit -q -m "formatted: ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7} — ${{ steps.format.outputs.summary }}"
+          git push -q -f \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" \
+            ci-formatted
+          echo "published ci-formatted"
