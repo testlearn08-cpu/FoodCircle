@@ -51,9 +51,52 @@ to.
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
 | Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
 | Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
-| Phase 2a Product surface: recipe page, recipe box, editor, profile | ✅ done | every destination is real and a recipe can be written from the app; 55 tests, green run [38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) |
+| Phase 2a Product surface: recipe page, recipe box, editor, profile | ✅ done | every destination is real and a recipe can be written from the app; green run [38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) |
+| Phase 2b Search: title + ingredient text, tag filter | ✅ done | migration 006 + 6 behavioural checks; 75 tests, green run [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443) |
 | Phase 1b Auth (screens, session, route guard) | ⬜ next | `/sign-in`, `/sign-up`, session persistence, `GoRouter` redirect. **In flight elsewhere:** PR #5 (`arena/b4829743-foodcircle`) is an open, green attempt at 1b + 1c. Do not duplicate it — take it, or coordinate with it. |
 | Phase 1c Migration 005 storage bucket + policies | ⬜ | needed by the recipe editor's image upload; also on PR #5's branch |
+
+---
+
+## 1b. Update — 2026-10-15 (later): search
+
+**Green run [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443), 75 tests, 28
+database checks.**
+
+S5 of the product spec. The job to be done behind the whole app is *"what can I make tonight?"*,
+and that means searching **inside the ingredient list** — the query `lentils` has to find the
+recipe whose ingredients say "1 cup red lentils". No PostgREST filter can express that: an array
+can be tested for containment, not for a substring of one of its elements. So the filtering had
+to move into the database, and that is the whole reason this is a migration and not a few lines
+of Dart.
+
+`supabase/migrations/006_recipe_search.sql` adds one function, `search_recipes`, and it is written
+to be as uninteresting as possible:
+
+| Property | Why |
+|---|---|
+| `security invoker` | The policies decide visibility, not the function. It contains no authorization logic at all — one boundary is debuggable, two that disagree are not. |
+| `set search_path = ''` + schema-qualified names | The same hardening 003 applies to the signup trigger; nobody can shadow `public.recipes`. |
+| A function, not a view | Check 2 forbids views in `public`, and a view would have to re-implement the visibility rule it can get wrong. |
+| `%` and `_` escaped in the query | A search for `50%` finds "50% off mince" instead of matching everything, and the SQL and in-memory implementations agree on what a needle means. |
+
+**Numbered 006, not 005.** PR #5 claims 005 for Storage, and nothing here depends on the order.
+
+New behavioural checks 22–28 cover what string-matching cannot: that anon and `authenticated`
+see only what the policies allow *through a search*, that matching is case-insensitive and
+reaches inside `text[]`, that the tag filter combines with the text query, that `%` is a literal,
+and that `max_rows` is clamped and `before` still paginates. Check 28 asserts the function's
+safety properties from `pg_proc`, so a later edit cannot quietly turn it into `security definer`.
+
+**Check 26 was wrong when first written and is worth recording**: it searched for `%%` — a bare
+`%` inside a RAISE string is a format placeholder, so the check was asserting against a query of
+two percents and passing without testing escaping at all. It now searches for a single `%`.
+
+Deliberate limits, all recorded in [`handoff/RECONCILIATION.md`](handoff/RECONCILIATION.md):
+substring matching, not semantic search or relevance ranking; title and ingredients, not
+description; exact tag matching; newest-first, so a search is never reordered by "best". It is a
+sequential scan — `ilike` cannot use an index — which is the right trade at zero rows, and the
+core-PostgreSQL upgrade path when it stops being one is a GIN index on `to_tsvector(...)`.
 
 ---
 
@@ -359,9 +402,10 @@ the same screens that ship, with no backend and no mocks.
 
 ### Phase 2 — The actual product: Feed, Recipes, Profile (size: L)
 
-**Status (2026-10-15): the screens exist; the gate below was not met.** Feed, recipe detail, the
-editor (minus images) and the profile are built and tested — see §1a. Search is not started, and
-the editor has no image field because uploads need `005_storage.sql`. What is worth restating is
+**Status (2026-10-15): the screens exist, and search with them; the gate below was not met.**
+Feed, recipe detail, the editor (minus images) and the profile are built and tested — see §1a —
+and search by title, ingredient and tag landed in §1b. The editor still has no image field,
+because uploads need `005_storage.sql` (PR #5). What is worth restating is
 the gate: these screens encode the inferences in `PRODUCT_SPEC.md`, so they are cheap to change
 now and expensive to change after Phase 3 builds on them.
 

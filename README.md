@@ -8,9 +8,9 @@ A responsive food-sharing community app — Flutter (Android / iOS / Web) on Sup
 Be clear about what this is today, because it is easy to misread the repo:
 
 - ✅ **Builds on every platform target, and its test suite passes** — in CI
-  ([run 38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019), all
+  ([run 38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443), all
   seven jobs): `flutter build web --release` publishes a runnable web bundle, `flutter build apk
-  --debug` produces an installable Android APK, and 55 tests + `analyze` + `dart format` are green.
+  --debug` produces an installable Android APK, and 75 tests + `analyze` + `dart format` are green.
 - ✅ Responsive navigation shell works: three top-level destinations (`/feed`, `/recipes`,
   `/profile`) with a desktop rail, tablet rail and mobile bottom bar, each with its own
   navigation stack.
@@ -27,6 +27,10 @@ Be clear about what this is today, because it is easy to misread the repo:
   recipe box (private ones included), and `/profile` is your identity — and tapping a recipe opens
   its page, with ingredients, steps, and delete for its author. A recipe can be written from the
   app too: `/recipes/new` and `/recipes/:id/edit` share one validated form.
+- ✅ **Search works, including inside ingredient lists.** The feed's search box matches titles and
+  ingredients, with tag chips built from the tags actually present. That filtering runs in the
+  database (`006_recipe_search.sql`), because a substring of one element of a `text[]` is not
+  something a PostgREST filter can express.
 - ❌ **Auth is not built.** There is no sign-in, so the writing screens run as the demo user when
   no project is configured and say "Not signed in" when one is. There is no route guard yet.
 
@@ -80,8 +84,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests
 |---|---|
 | `No credentials committed` | No `service_role` key, personal access token or private key is in the repository. It is public, and a leaked `service_role` key bypasses every RLS policy. |
 | `SQL expectations` | The RLS policies and the `auth.users` leak guard still exist as written (python3, ~5s). |
-| `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 21 checks as `anon` / `authenticated` / `service_role`. |
-| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean, 7 widget tests pass. |
+| `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 28 checks as `anon` / `authenticated` / `service_role`, including the ones that prove a search cannot see past the visibility rule. |
+| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean, 75 tests pass. |
 | `Scaffolding report` | Diffs the repo against what `flutter create` generates, and publishes a pristine reference app to `ci-scaffold`. |
 | `Build web + publish preview` | `flutter build web --release` succeeds, and a run that is not a pull request force-pushes the bundle to the `preview` branch. PR runs build it without publishing, so a broken web build still fails the PR. |
 | `Build debug APK` | The Android target really builds; the APK is attached to the run. |
@@ -117,7 +121,7 @@ lib/data/                         models + repositories (Supabase and in-memory)
 lib/features/feed/                the public feed
 lib/features/recipes/             recipe page, recipe box, editor
 lib/features/profile/             the profile screen
-supabase/migrations/              001 schema · 002 indexes+triggers · 003 auth helpers · 004 metadata
+supabase/migrations/              001 schema · 002 indexes+triggers · 003 auth helpers · 004 metadata · 006 search
 supabase/tests/                   behavioural RLS suite, migration-upgrade test, auth stub
 test/                             navigation, policies, models, repositories, feed, detail, editor, profile
 tool/check_sql_expectations.py    fast local mirror of the policy assertions
