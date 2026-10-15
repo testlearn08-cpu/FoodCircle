@@ -83,7 +83,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests
 | `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 21 checks as `anon` / `authenticated` / `service_role`. |
 | `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean, 7 widget tests pass. |
 | `Scaffolding report` | Diffs the repo against what `flutter create` generates, and publishes a pristine reference app to `ci-scaffold`. |
-| `Build web + publish preview` | `flutter build web --release` succeeds and force-pushes the bundle to the `preview` branch. |
+| `Build web + publish preview` | `flutter build web --release` succeeds, and a run that is not a pull request force-pushes the bundle to the `preview` branch. PR runs build it without publishing, so a broken web build still fails the PR. |
 | `Build debug APK` | The Android target really builds; the APK is attached to the run. |
 | `Publish logs to ci-artifacts` | Every job's output is pushed to `ci-artifacts` — the only way to read CI failures from a sandbox with no log access. |
 
