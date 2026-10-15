@@ -51,8 +51,46 @@ to.
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
 | Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
 | Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
-| Phase 1b Auth (screens, session, route guard) | ⬜ next | `/sign-in`, `/sign-up`, session persistence, `GoRouter` redirect |
-| Phase 1c Migration 005 storage bucket + policies | ⬜ | needed by the recipe editor's image upload |
+| Phase 2a Product surface: recipe page, recipe box, editor, profile | ✅ done | every destination is real and a recipe can be written from the app; 55 tests, green run [38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) |
+| Phase 1b Auth (screens, session, route guard) | ⬜ next | `/sign-in`, `/sign-up`, session persistence, `GoRouter` redirect. **In flight elsewhere:** PR #5 (`arena/b4829743-foodcircle`) is an open, green attempt at 1b + 1c. Do not duplicate it — take it, or coordinate with it. |
+| Phase 1c Migration 005 storage bucket + policies | ⬜ | needed by the recipe editor's image upload; also on PR #5's branch |
+
+---
+
+## 1a. Update — 2026-10-15: the product surface is real
+
+**Branch `arena/3ccdc2bb-foodcircle`, run
+[38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) (all 7 jobs
+green, `dart format` 0 changed, 55 tests).**
+
+The gap this closed was not plumbing: `RecipeRepository` already had `fetchFeed`, `fetchById`,
+`fetchMine`, `create` and `delete`, implemented twice (Supabase and in-memory), and the UI used
+exactly one of them. Two of the three destinations rendered "Not implemented yet", and tapping a
+recipe in the feed showed a snackbar saying the detail screen was not built.
+
+What changed:
+
+| Area | Before | Now |
+|---|---|---|
+| Recipe page | snackbar "not built yet" | `/feed/:id` and `/recipes/:id`: photo, description, servings / time / difficulty chips, a Private marker, author, tags, ingredients, numbered steps, delete for the author. `null` from the repository means "deleted or not yours" and the screen deliberately says neither. |
+| `/recipes` | `PlaceholderScreen` | your own recipe box via `fetchMine`, private rows included, with a New recipe action. |
+| Editor | did not exist | `/recipes/new` and `/recipes/:id/edit` share one validated form. Validation mirrors the `CHECK` constraints in migration `004` (title 1–120, servings 1–100, times 0–1440, ≤10 tags) so the database never has to refuse a submission. An edit keeps the image and `created_at` a row already has. |
+| `/profile` | `PlaceholderScreen` | identity (name, username, bio), a recipe count, and a way into the recipe box; "Not signed in" when there is no session. |
+| Sharing | the feed's tile, banner and empty/error views were private to `feed_screen.dart` | `lib/core/widgets/`: one list with the three states the spec asks for, one tile, one avatar, one demo banner. |
+| `responsive_framework` | §4.3's 🟡 item: decorative **and** wrong (its desktop band ended at 1920, so a 2560px monitor fell outside every breakpoint) | **removed**, dependency included. `responsive_shell.dart`'s two constants are the single source of truth. |
+
+New in the interface: `fetchProfile(id)` and `update(id, draft)` — the latter removes `author_id`
+and `image_url` from the update, so a recipe cannot quietly change hands and an edit cannot drop a
+photo the editor has no field for. `lib/core/session.dart` holds `currentUserIdProvider`, the seam
+Phase 1b replaces; no screen reads an auth API directly.
+
+Two things this did **not** do, on purpose: **edit a profile** (`profiles_update_own` and
+`Profile.toUpdateJson` exist, but a form that cannot upload an avatar is not the form that
+ships) and **upload an image** (needs `005_storage.sql` — PR #5's territory).
+
+Evidence, in the repository's own idiom: every screen was exercised through the real provider
+graph in widget tests (`recipe_detail_test.dart`, `recipe_editor_test.dart`, `profile_test.dart`),
+the web build and the debug APK both built from this branch, and `format.log` is 0 changed.
 
 **Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
 analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
@@ -85,6 +123,9 @@ app on `ci-scaffold` reveals what the current template really looks like.
 ## 3. Inventory — what exists and what it actually does
 
 ### 3.1 Application code (615 LOC)
+
+> **Snapshot of v0.2 as analysed.** `lib/screens/placeholder_screen.dart` no longer exists and
+> four of the screens below are superseded — see §1a for what replaced them.
 
 | File | LOC | State | Notes |
 |---|---|---|---|
@@ -165,11 +206,11 @@ coin flip, and `python3 -m http.server` on a fetched `build/web` becomes a live 
 - **No auth flow or route guard.** `GoRouter` has no `redirect`, no `/sign-in` or `/sign-up`, no
   `errorBuilder`. An unauthenticated user cannot be distinguished from an authenticated one.
 - **No feature structure.** Five files total under `lib/`; no `features/`, `data/`, `core/`.
-- 🟡 `ResponsiveBreakpoints.builder` is **decorative and risky**: the shell reads
-  `MediaQuery.of(context).size.width` directly (`responsive_shell.dart:71`) while the breakpoint list
-  in `app.dart:42-48` ends the desktop band at **1920** — a 2560px monitor falls outside every
-  breakpoint. Either read the breakpoints properly (`ResponsiveBreakpoints.of(context)`) or drop the
-  dependency; keeping both is the worst option.
+- ✅ **Fixed 2026-10-15** — was 🟡: `ResponsiveBreakpoints.builder` was **decorative and risky**.
+  The shell read `MediaQuery.of(context).size.width` directly while the breakpoint list in
+  `app.dart` ended the desktop band at **1920**, so a 2560px monitor fell outside every breakpoint
+  it declared. The list and the dependency are gone; `responsive_shell.dart`'s two constants are
+  now the only definition. See §1a.
 - 🟡 `assets/` is declared and empty (`.gitkeep`); no images, icons, or splash configured.
 - ⚪ No dark theme, no localization setup, no a11y semantics, no analytics/crash reporting.
 
@@ -189,6 +230,10 @@ coin flip, and `python3 -m http.server` on a fetched `build/web` becomes a live 
 - ⚪ No `supabase/config.toml`, so `supabase start` (local dev DB) is not configured.
 
 ### 4.5 Product — 🔴 there is nothing to use
+
+> **Superseded 2026-10-15:** all three destinations are real and a recipe can be written,
+> read, edited and deleted from the app — the part still missing is anything that needs an
+> account, which is Phase 1b. See §1a. What follows is the v0.2 assessment it replaced.
 
 Three destinations (`/feed`, `/recipes`, `/profile`) render "Not implemented yet". **No user can sign
 up, create a recipe, see a recipe, or edit a profile.** There is no search, no social graph, no
@@ -313,6 +358,12 @@ the same screens that ship, with no backend and no mocks.
 - Tests: fake-repository unit tests, auth-gate widget tests, sign-in → feed journey.
 
 ### Phase 2 — The actual product: Feed, Recipes, Profile (size: L)
+
+**Status (2026-10-15): the screens exist; the gate below was not met.** Feed, recipe detail, the
+editor (minus images) and the profile are built and tested — see §1a. Search is not started, and
+the editor has no image field because uploads need `005_storage.sql`. What is worth restating is
+the gate: these screens encode the inferences in `PRODUCT_SPEC.md`, so they are cheap to change
+now and expensive to change after Phase 3 builds on them.
 
 - Feed: public recipes, paginated (keyset on `created_at,id`), pull-to-refresh, author chips,
   loading/empty/error states.

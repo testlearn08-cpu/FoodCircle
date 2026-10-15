@@ -8,9 +8,9 @@ A responsive food-sharing community app — Flutter (Android / iOS / Web) on Sup
 Be clear about what this is today, because it is easy to misread the repo:
 
 - ✅ **Builds on every platform target, and its test suite passes** — in CI
-  ([run 38535122523](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38535122523)):
-  `flutter build web --release` publishes a runnable web bundle, `flutter build apk --debug`
-  produces an installable Android APK, and `analyze` + `test` + `dart format` are green.
+  ([run 38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019), all
+  seven jobs): `flutter build web --release` publishes a runnable web bundle, `flutter build apk
+  --debug` produces an installable Android APK, and 55 tests + `analyze` + `dart format` are green.
 - ✅ Responsive navigation shell works: three top-level destinations (`/feed`, `/recipes`,
   `/profile`) with a desktop rail, tablet rail and mobile bottom bar, each with its own
   navigation stack.
@@ -87,11 +87,17 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests
 | `Build debug APK` | The Android target really builds; the APK is attached to the run. |
 | `Publish logs to ci-artifacts` | Every job's output is pushed to `ci-artifacts` — the only way to read CI failures from a sandbox with no log access. |
 
+`.github/workflows/format.yml` is a second workflow, on `arena/**` pushes only: it runs
+`dart format .` and publishes the result to `ci-formatted`, so the formatting the gate above
+demands can be read rather than guessed at from a sandbox that has no Dart SDK. It is a
+development aid, not a gate — `flutter analyze + test` in `ci.yml` is the gate.
+
 ### Bot branches (never merge these)
 
 `ci-artifacts` (one commit per run: every job's logs plus `RUN.md`), `ci-scaffold`
 (`flutter create` output plus a pristine `vanilla/` template app), `preview` (the built web
-bundle). Each is force-pushed by the run that owns it.
+bundle), `ci-formatted` (the tree as `dart format` would write it). Each is force-pushed by the
+run that owns it.
 
 ```bash
 git fetch origin ci-artifacts && git show origin/ci-artifacts:RUN.md   # what ran, what failed
