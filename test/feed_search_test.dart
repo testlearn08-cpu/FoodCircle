@@ -119,7 +119,8 @@ void main() {
     );
   });
 
-  testWidgets('the clear button empties the field and the filter', (tester) async {
+  testWidgets('the clear button empties the field and the filter',
+      (tester) async {
     await pumpFeed(tester);
 
     await search(tester, 'bread');
@@ -182,7 +183,7 @@ void main() {
 
     await search(tester, 'bread');
 
-    expect(onFeed('Demo data · no Supabase project configured'),
-        findsOneWidget);
+    expect(
+        onFeed('Demo data · no Supabase project configured'), findsOneWidget);
   });
 }

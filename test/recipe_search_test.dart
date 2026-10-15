@@ -67,8 +67,9 @@ void main() {
   test('a query and a tag narrow together', () async {
     final repository = InMemoryRecipeRepository.seeded();
 
-    expect((await repository.fetchFeed(query: 'lentil', tag: 'weeknight'))
-        .length, 1);
+    expect(
+        (await repository.fetchFeed(query: 'lentil', tag: 'weeknight')).length,
+        1);
     // Both conditions have to hold: the dal matches the text but not the tag.
     expect(await repository.fetchFeed(query: 'lentil', tag: 'baking'), isEmpty);
   });
@@ -152,7 +153,8 @@ void main() {
     }
   });
 
-  test('the tag chips cover every tag in the feed, without duplicates', () async {
+  test('the tag chips cover every tag in the feed, without duplicates',
+      () async {
     final repository = InMemoryRecipeRepository.seeded();
 
     final Set<String> tags = <String>{
