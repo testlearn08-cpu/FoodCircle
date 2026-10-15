@@ -44,8 +44,7 @@ const double kDesktopMinWidth = 800;
 
 /// Responsive navigation scaffold.
 ///
-/// Status: Implemented (file). Unverified — no Flutter SDK in the authoring
-/// environment, so this has never been rendered. See DEVELOPMENT_STATUS.md.
+/// The shell is exercised by the widget tests; compilation and rendering are verified in CI.
 ///
 /// Breakpoints (kept in step with the `Breakpoint` list in `lib/app.dart`):
 /// mobile <= 450, tablet 451-800, desktop > 800.

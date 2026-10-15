@@ -1,17 +1,31 @@
 # FoodCircle — Full Analysis & Continuation Plan
 
-> Written: 2026-10-14 · Branch: `arena/d6651471-foodcircle` · Base commit: `eff5019` (main)
-> Supersedes the "Next Steps" sections in `DEVELOPMENT_STATUS.md` and the open questions in `ARCHITECTURE.md`.
+> Original analysis: 2026-10-14 · Current continuation branch: `arena/b4829743-foodcircle` · Base: `d5b7e573`
+> The baseline inventory below predates Phase 1a; see the continuation update and progress table for current status.
 
 ---
 
 ## 1. TL;DR — where the project actually stands
 
-**FoodCircle today is a navigation skeleton with a genuinely green CI pipeline and zero product
-functionality.** The 615 lines of Dart in the repo are a router, a responsive nav shell, one
-placeholder screen, and 362 lines of tests. There is no data layer, no authentication, no screen
-that shows a recipe, and no buildable Android/iOS/web target. Supabase is *declared* in
-`pubspec.yaml` and *never imported*.
+**Continuation update (2026-10-14): this section is now a historical baseline, not a current
+inventory.** Since the original analysis below, Phase 1a added the recipe data layer and public feed.
+Phase 1b auth and Phase 1c Storage policies were reconstructed from inferred repository docs and
+verified by CI run [38560095418](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38560095418)
+(PR #5). With explicit user authorization, this branch now also has a repository-only image-upload
+adapter based strictly on the existing inferred `recipe-images` bucket contract; the adapter's
+follow-up CI run is the validation gate for that change.
+
+Current gates: no authoritative handoff is present; no Supabase project exists; no migration has
+been deployed; location, notifications and offline still have no schema; and Phase 2 (recipe detail,
+editor, search) remains blocked on the handoff and explicit sign-off. The bucket visibility, size,
+MIME allowlist and folder convention remain provisional. The upload editor/UI and its progress,
+retry, resizing and cleanup behavior are not part of this repository-only slice. The repository's
+existing CI and local Python guards are the only available verification path because Flutter/Dart
+are not installed in this sandbox.
+
+The baseline inventory and analysis that follow describe the earlier pre-Phase-1a snapshot unless
+updated in the progress table below. Do not use their old source counts or "no auth" statements as
+current facts.
 
 Three things changed my read versus what the existing docs say, and all three are verified:
 
@@ -51,8 +65,8 @@ to.
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
 | Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
 | Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
-| Phase 1b Auth (screens, session, route guard) | ⬜ next | `/sign-in`, `/sign-up`, session persistence, `GoRouter` redirect |
-| Phase 1c Migration 005 storage bucket + policies | ⬜ | needed by the recipe editor's image upload |
+| Phase 1b Auth (screens, session, route guard) | ✅ verified in CI; included in open PR #5 | Supabase adapter + ephemeral fake, `/sign-in`, `/sign-up`, auth-state redirect refresh, sign-out; no Supabase project for end-to-end verification |
+| Phase 1c Migration 005 storage bucket + policies | ✅ policies verified in CI; repository upload adapter added as a provisional follow-up | Inferred public `recipe-images` bucket and UUID-folder write policies; upload API follows only this provisional contract; not deployed and still rewritable |
 
 **Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
 analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
@@ -288,29 +302,36 @@ behaviour tests; readable logs; a live preview URL of the running app; docs accu
   debugged through CI — twice, because the first version silently depended on whether the
   runner sends each statement in its own transaction (`psql`) or the whole file in one.
 
-### Phase 1 — Data & auth foundation (size: M–L) · in progress
+### Phase 1 — Data & auth foundation (size: M–L) · 1a/1b/1c verified; upload API follow-up
 
-**Done so far (1a):** migration `004` adds image / servings / prep+cook minutes / difficulty /
-tags, converts `ingredients` and `steps` from untyped `jsonb` to `text[]`, and adds the
-constraints and indexes the feed and search need — with a new **upgrade-path** phase in
-`supabase/tests/run.sh` that seeds rows in the old shape and proves the conversion preserves
-them (commas, quotes and empty lists included). On the app side: `Env` reads the project URL and
-publishable key from `--dart-define`; `Recipe`/`Profile` models parse PostgREST rows forgivingly;
-`RecipeRepository` has a Supabase implementation and an in-memory one; Riverpod (until now a dead
-dependency) selects between them; and `/feed` is a real screen with pull-to-refresh, loading,
-empty and error states, plus a banner that says when a build is running on demo data. Because
-"no project configured" is a supported state, the CI-built web preview and the widget tests run
-the same screens that ship, with no backend and no mocks.
+**Phase 1a is verified in CI:** migration `004` adds recipe metadata and converts the ingredient
+and step lists with a legacy-data upgrade test. The app has `Env`, forgiving `Recipe`/`Profile`
+models, Supabase and in-memory repositories, Riverpod wiring, and a real public feed with loading,
+empty, error and refresh states.
 
-- `004_recipes_metadata.sql`: `image_url`, `tags text[]`, `servings`, `prep_minutes`, `cook_minutes`,
-  `difficulty`, `CHECK` constraints, `updated_at NOT NULL`, GIN index on tags, trigram index on title.
-- `005_storage.sql`: `recipe-images` bucket + owner-scoped storage policies.
-- App: `lib/core/config/env.dart` + `--dart-define` contract + `.env.example`;
-  `Supabase.initialize`; `ProviderScope`; Riverpod providers for client, session, profile.
-- Models + repository interfaces + Supabase impls + in-memory fakes.
-- Auth: sign-up / sign-in / sign-out screens, session persistence, `GoRouter` redirect guard,
-  auth-state-driven router refresh.
-- Tests: fake-repository unit tests, auth-gate widget tests, sign-in → feed journey.
+**Phase 1b/1c were reconstructed from inferred repository docs, not from the missing handoff:**
+
+- `AuthRepository` has Supabase and ephemeral in-memory implementations. The Supabase adapter uses
+  email/password sign-in, sends the username to the existing profile-provisioning trigger, and
+  relies on `supabase_flutter` for session persistence. The demo fake stores no password and is not
+  real authentication.
+- `/feed` is public; `/recipes` and `/profile` are guarded. Sign-in, sign-up and sign-out paths use
+  a same-app return target; the current Profile screen is only an account/sign-out surface.
+- `005_storage.sql` creates an inferred public `recipe-images` bucket. Reads are public; inserts,
+  updates and deletes must remain under the caller's UUID folder. A 10 MiB limit and JPEG/PNG/WebP
+  allowlist are provisional and must be reconciled with the handoff before deployment.
+- With explicit authorization for this provisional follow-up, `RecipeRepository.uploadImage`
+  accepts bytes plus MIME type, validates the current inferred size/format limits, derives a unique
+  object name, places it under the current Supabase auth user's folder, disables overwrite, and
+  returns the public URL. The in-memory demo refuses uploads rather than pretending to persist them.
+- Static policy assertions and PostgreSQL behavior tests verified the Storage policies in CI run
+  `38560095418`; the repository upload adapter is a follow-up change covered by the current branch's
+  CI. No Supabase project is used or created. Migration `005` has not been deployed and remains
+  rewritable.
+
+No editor or recipe-screen integration, resizing, upload progress/retry, cleanup, or avatar upload is
+included. Reconcile the inferred bucket rules before deployment; keep the rest of Phase 2 behind the
+handoff review and explicit sign-off.
 
 ### Phase 2 — The actual product: Feed, Recipes, Profile (size: L)
 

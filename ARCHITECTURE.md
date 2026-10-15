@@ -1,88 +1,102 @@
 # FoodCircle Architecture
 
-> **Status update (2026-10-14):** the "Unverified" caveat below applied only to the authoring
-> sandbox of the first pass. `flutter analyze` and `flutter test` have since run green in CI
-> ([run 38525965333](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38525965333)),
-> so the shared foundation, the navigation shell and the tests described here are now
-> **verified to compile and pass**. The database migrations remain unapplied and unverified.
-> See [`docs/ANALYSIS_AND_ROADMAP.md`](docs/ANALYSIS_AND_ROADMAP.md).
-
-Status: Implemented (document). Unverified — exact architecture from the v0.2
-prototype / handoff is still unavailable, and no Flutter SDK was present in the
-authoring environment, so nothing here has been compiled or run.
+> **Current continuation status (2026-10-14):** The repository has a data/feed foundation and an
+> inferred email/password auth + recipe-image-storage slice. The auth/storage slice was reconstructed
+> from this repository's roadmap because the authoritative handoff is missing; its source and SQL
+> are awaiting the next CI compile/test run. No Supabase project exists, and nothing is deployed.
+> `docs/handoff/RECONCILIATION.md` records the assumptions that still need the real handoff.
 
 ## Stack
-- Flutter 3.10+ (Android / iOS / Web shared foundation)
-- Supabase (PostgreSQL + Auth + Storage)
-- GoRouter (navigation)
-- ResponsiveFramework (breakpoints)
-- Riverpod (declared in `pubspec.yaml`; **not yet integrated**)
 
-## Shared Foundation
-- `lib/main.dart` — entry point.
-- `lib/app.dart` — `MaterialApp.router`, the `GoRouter` definition, and the
-  `ResponsiveBreakpoints` configuration.
-- `lib/navigation/responsive_shell.dart` — responsive navigation shell plus the
-  shared destination list and layout breakpoint constants.
-- `lib/screens/placeholder_screen.dart` — body used by destinations that have no
-  real screen yet.
-- `android/app/` — Android manifest and build config.
-- `ios/Runner/` — iOS runner assets and config placeholders.
-- `web/index.html` — web entry that boots the generated `flutter_bootstrap.js`.
-- `assets/` — empty asset directory; `pubspec.yaml` declares it, so it must exist
-  or `flutter pub get` fails.
+- Flutter (Android / iOS / Web)
+- Supabase (PostgreSQL + Auth + Storage), initialized only when URL and publishable/anon key are supplied
+- GoRouter for navigation and auth redirects
+- Riverpod for repository and session providers
+- ResponsiveFramework for breakpoints
 
-## Navigation
-One `StatefulShellRoute.indexedStack` branch per top-level destination
-(`/feed`, `/recipes`, `/profile`). The shell wraps the router's
-`StatefulNavigationShell`, which means:
+## Application startup and providers
 
-- selecting a destination swaps only the branch body — the rail / bottom bar
-  stays mounted;
+- `lib/main.dart` initializes Flutter and conditionally initializes Supabase. The only client
+  credential is the publishable/anon key supplied with `--dart-define`; `service_role` must never
+  enter a client build.
+- `lib/core/config/env.dart` reads `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` at build time.
+- `lib/core/providers.dart` selects Supabase adapters when configured and in-memory fakes otherwise.
+  The no-project auth fake is ephemeral demo behavior, not a security boundary or persistent account
+  store.
+- Recipe data and authentication are behind separate repository interfaces. UI code never receives
+  Supabase tokens or calls Supabase Auth directly.
+
+## Authentication and routing
+
+`lib/data/repositories/auth_repository.dart` defines the app-facing sign-in, sign-up, sign-out and
+session stream. `SupabaseAuthRepository` delegates to `supabase_flutter`, whose local session
+persistence is used for configured builds; `InMemoryAuthRepository` emits an ephemeral demo identity
+when no project is configured.
+
+The public feed (`/feed`) is available signed out. `/recipes` and `/profile` are session-gated. The
+router reads the current user for its initial redirect and listens to auth-state changes to rerun
+redirects. Return targets are restricted to same-app paths. `/profile` currently provides only the
+identity and a sign-out action; profile editing and recipe management remain in the later,
+handoff-gated product phase.
+
+Sign-up sends the username as auth metadata so the existing `handle_new_user` database trigger can
+create the `public.profiles` row. Supabase may require email confirmation; in that case the UI tells
+the user to confirm before signing in. The demo fake does not send email and never persists a
+password.
+
+> The email/password flow and the routes it gates are inferred, not approved product requirements.
+> Reconcile them against the missing handoff before expanding the auth or onboarding surface.
+
+## Responsive navigation
+
+One `StatefulShellRoute.indexedStack` branch per top-level destination (`/feed`, `/recipes`,
+`/profile`). The shell wraps the router's `StatefulNavigationShell`, which means:
+
+- selecting a destination swaps only the branch body — the rail / bottom bar stays mounted;
 - each destination keeps its own navigation stack;
 - re-selecting the active destination pops that branch back to its root.
 
-`ResponsiveShell` derives both layouts from the single
-`kNavigationDestinations` list, so the rail and bottom bar cannot drift apart.
+`ResponsiveShell` derives both layouts from the single `kNavigationDestinations` list, so the rail and
+bottom bar cannot drift apart.
 
-Breakpoints (identical in `lib/app.dart` and `responsive_shell.dart`):
-mobile <= 450, tablet 451-800, desktop > 800. Desktop uses an extended rail,
-tablet a labelled compact rail, mobile a `BottomNavigationBar`.
+Breakpoints (identical in `lib/app.dart` and `responsive_shell.dart`): mobile <= 450, tablet 451–800,
+desktop > 800. Desktop uses an extended rail, tablet a labelled compact rail, mobile a
+`BottomNavigationBar`.
 
-> Note: `NavigationRail` asserts that an extended rail uses `labelType` of
-> `null` or `NavigationRailLabelType.none`. Passing `selected` for the desktop
-> case — as an earlier revision did — trips that assertion on desktop widths.
+> `NavigationRail` asserts that an extended rail uses `labelType` of `null` or
+> `NavigationRailLabelType.none`. Passing `selected` for the desktop case trips that assertion.
 
-## Privacy Rules (Unverified Against Prototype)
-- Profiles: readable by anyone; insert / update / delete restricted to the owner
-  (`auth.uid() = id`). The insert policy is required for a client to create its
-  own profile row.
-- Recipes: readable when `is_public` or when the reader is the author; insert /
-  update / delete restricted to the author (`auth.uid() = author_id`).
-- `recipes.author_id` is `NOT NULL`, matching what the insert policy enforces.
-- RLS is enabled on both tables. Every policy is preceded by
-  `DROP POLICY IF EXISTS`, so a partially applied migration can be re-run.
-- `003_auth_helpers.sql` provisions a `public.profiles` row for each new
-  `auth.users` row via a `SECURITY DEFINER` trigger function with an empty
-  `search_path` and schema-qualified identifiers; `EXECUTE` is revoked from
-  `PUBLIC`. It no longer exposes any view over `auth.users` — see below.
+## Database and Storage
 
-### Removed: `public.auth_users`
-An earlier revision of `003_auth_helpers.sql` created
-`CREATE VIEW public.auth_users AS SELECT id, email FROM auth.users`.
+Migrations `001`–`004` define profiles, recipes, RLS, auth helpers and recipe metadata. Migration
+`005_storage.sql` is an inferred, rewritable migration that creates the public `recipe-images` bucket
+and confines insert/update/delete operations to the authenticated user's UUID folder. Its current
+10 MiB and JPEG/PNG/WebP limits are provisional. Public reads are intentional for recipe images.
 
-That view was a data leak. A PostgreSQL view runs with the privileges of its
-owner unless `security_invoker` is set (the default is owner privileges through
-at least PostgreSQL 15), so the view read `auth.users` without the RLS policies
-that protect it. Because Supabase exposes the `public` schema to the `anon` key,
-any client could have read every user's id and email address. The view is
-dropped, and `test/privacy_test.dart` asserts that no migration creates a view.
+The test suite uses test-only stand-ins for Supabase-managed `auth` and `storage` objects, then checks
+row and Storage policies against PostgreSQL. These tests prove behavior of the local migration model,
+not deployment to a Supabase project. No project exists, no key is configured in CI, and no migration
+has been deployed.
 
-## Verification Status
-- Flutter SDK: **NOT PRESENT** (`flutter` / `dart` not in `$PATH`) — nothing is
-  compiled, analysed, or tested.
-- Supabase CLI / instance: **NOT PRESENT** — no migration has ever been applied.
-- `tool/check_sql_expectations.py`: re-implements the assertions in
-  `test/privacy_test.dart` in Python and confirms each expected fragment really
-  occurs in the migrations. This is a stand-in for the un-runnable suite, not a
-  substitute for it.
+Other product-facing data models are not present yet: location, notifications and offline behavior
+have no schema or implementation. Do not infer those subsystems without the authoritative handoff.
+
+## Security notes
+
+- Profiles are readable by anyone; their writes are owner-restricted.
+- Recipes are readable when public or by their author; writes are restricted to the author.
+- `recipes.author_id` is `NOT NULL` and references `auth.users`.
+- A hardened `SECURITY DEFINER` trigger provisions profiles without exposing `auth.users` through a
+  public view.
+- Storage writes are folder-scoped using `(storage.foldername(name))[1] = auth.uid()::text`.
+- RLS and Storage policies, not client-side checks, are the authorization boundary.
+- `service_role` bypasses RLS and must never reach the client.
+
+## Verification status
+
+- The existing Phase 1a app and migrations `001`–`004` were compiled/tested by CI at main commit
+  `d5b7e57307f4c0ff90e8bfd9cd3b6df685fb00a4`.
+- The new auth Dart and migration `005` are not considered verified until the current branch's CI
+  analyze, test, formatting and database-behavior jobs pass.
+- This sandbox has no Flutter/Dart SDK, Supabase CLI or Supabase project. Local Python static checks
+  supplement (but do not replace) CI compilation and PostgreSQL execution.
