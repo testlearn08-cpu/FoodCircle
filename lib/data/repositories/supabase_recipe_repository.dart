@@ -77,12 +77,8 @@ class SupabaseRecipeRepository implements RecipeRepository {
       // so an edit must not silently drop an image the row already has.
       ..remove('image_url');
 
-    final row = await _client
-        .from(_table)
-        .update(json)
-        .eq('id', id)
-        .select()
-        .single();
+    final row =
+        await _client.from(_table).update(json).eq('id', id).select().single();
     return Recipe.fromJson(row);
   }
 
