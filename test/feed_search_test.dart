@@ -41,6 +41,17 @@ Finder onFeed(String text) => find.descendant(
       matching: find.text(text),
     );
 
+/// Taps a tag chip. The chip row scrolls sideways, so at phone width the later chips are
+/// outside the viewport and a tap on one would land nowhere — `ensureVisible` scrolls it in
+/// first, which is also what a person does before tapping it.
+Future<void> tapChip(WidgetTester tester, String tag) async {
+  final Finder chip = onFeed(tag);
+  await tester.ensureVisible(chip);
+  await tester.pumpAndSettle();
+  await tester.tap(chip);
+  await tester.pumpAndSettle();
+}
+
 Future<void> search(WidgetTester tester, String text) async {
   await tester.enterText(find.byType(TextField), text);
   await tester.pump(kPastDebounce);
@@ -133,16 +144,14 @@ void main() {
     expect(onFeed('#vegetarian'), findsOneWidget);
     expect(onFeed('#weeknight'), findsOneWidget);
 
-    await tester.tap(onFeed('#baking'));
-    await tester.pumpAndSettle();
+    await tapChip(tester, '#baking');
 
     expect(onFeed('No-knead bread'), findsOneWidget);
     expect(onFeed('Everyday dal'), findsNothing);
     // The other chips are still offered: filtering by a tag must not remove the way back.
     expect(onFeed('#vegetarian'), findsOneWidget);
 
-    await tester.tap(onFeed('#baking'));
-    await tester.pumpAndSettle();
+    await tapChip(tester, '#baking');
 
     expect(onFeed('Everyday dal'), findsOneWidget);
     expect(onFeed('No-knead bread'), findsOneWidget);
@@ -151,8 +160,7 @@ void main() {
   testWidgets('a tag and a text query narrow together', (tester) async {
     await pumpFeed(tester);
 
-    await tester.tap(onFeed('#weeknight'));
-    await tester.pumpAndSettle();
+    await tapChip(tester, '#weeknight');
     await search(tester, 'lentil');
 
     expect(onFeed('Everyday dal'), findsOneWidget);

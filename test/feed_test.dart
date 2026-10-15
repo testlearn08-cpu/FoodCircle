@@ -102,12 +102,16 @@ void main() {
 
     expect(find.text('Could not load the feed'), findsOneWidget);
     expect(find.textContaining('the network is on fire'), findsOneWidget);
-    expect(repository.calls, 1);
+    // Not an exact count any more: the tag chips are derived from the feed and read the same
+    // repository, so they fail alongside it. What matters is that the feed was asked at all, and
+    // that asking again is what the retry does.
+    final int before = repository.calls;
+    expect(before, greaterThan(0));
 
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
 
-    expect(repository.calls, 2,
+    expect(repository.calls, greaterThan(before),
         reason: 'retry must re-run the provider, not just rebuild');
   });
 }

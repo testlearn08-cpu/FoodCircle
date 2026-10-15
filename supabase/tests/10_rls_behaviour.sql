@@ -601,17 +601,33 @@ begin
   raise notice 'ok 25. the tag filter narrows a search and combines with the text query';
 
   -- 26. `%` and `_` are literals in a query, not wildcards.
+  --
+  -- Note for anyone editing the messages below: a `%` inside a RAISE string is a format
+  -- placeholder, so these deliberately spell "percent" out. Writing a bare one here fails at
+  -- runtime with "too few parameters specified for RAISE" — which is how this check was
+  -- written the first time.
   perform set_config('role', 'none', true);
+
   select count(*) into n from public.search_recipes(q => '50%');
   if n <> 1 then
-    raise exception '"50%%" matched % rows, expected only the recipe containing "50%%"', n;
+    raise exception 'search for the text ''50 percent'' matched % rows, expected 1', n;
   end if;
 
-  select count(*) into n from public.search_recipes(q => '%%');
-  if n <> 0 then
-    raise exception 'a query of "%%%%" matched % rows: the wildcards were not escaped', n;
+  -- A bare percent is not "match everything": it finds the single fixture whose ingredient list
+  -- literally contains one. An unescaped LIKE pattern would have returned every public recipe,
+  -- which is what makes this the assertion that matters.
+  select count(*) into n from public.search_recipes(q => '%');
+  if n <> 1 then
+    raise exception
+      'a query of one percent matched % rows, expected the 1 row containing a literal one', n;
   end if;
-  raise notice 'ok 26. %% and _ in a query are literals, not wildcards';
+
+  -- ...and an underscore matches nothing, because no fixture contains one.
+  select count(*) into n from public.search_recipes(q => '_');
+  if n <> 0 then
+    raise exception 'a query of one underscore matched % rows, expected none', n;
+  end if;
+  raise notice 'ok 26. percent and underscore in a query are literals, not wildcards';
 
   -- 27. pagination and the row cap follow the same contract as the feed.
   perform set_config('role', 'anon', true);

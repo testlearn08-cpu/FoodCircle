@@ -112,8 +112,11 @@ void main() {
 
     expect(titles(await repository.fetchFeed(query: '50%')),
         <String>['Discount day']);
-    // A bare wildcard would match everything; escaped, it matches nothing.
-    expect(await repository.fetchFeed(query: '%'), isEmpty);
+    // A bare "%" is a literal: it finds the one recipe that contains one, rather than matching
+    // every recipe the way an unescaped LIKE wildcard would.
+    expect(titles(await repository.fetchFeed(query: '%')),
+        <String>['Discount day']);
+    // Nothing in the fixture contains an underscore.
     expect(await repository.fetchFeed(query: '_'), isEmpty);
   });
 
