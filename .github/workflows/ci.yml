@@ -288,7 +288,14 @@ jobs:
         run: |
           set -o pipefail
           flutter build web --release 2>&1 | tee "$LOGS_DIR/build-web.log"
+      # Pull requests build the bundle but do not publish it. Every `arena/**` push fires two
+      # runs of the same commit — this workflow on the branch, and again on the PR's merge ref —
+      # and both of them used to force-push `preview`. Two force-pushes to one ref race, and the
+      # loser fails the job having proved nothing: run 38694457685 went red with a green
+      # `flutter build web --release` above it. The branch's own push run is the publisher; the
+      # PR run still builds, so a broken web build still fails the PR.
       - name: Publish build/web to the preview branch
+        if: github.event_name != 'pull_request'
         run: |
           cd build/web
           git init -q
