@@ -19,6 +19,7 @@ class RecipeAsyncList extends StatelessWidget {
     required this.emptyMessage,
     required this.onRetry,
     this.emptyIcon = Icons.ramen_dining_outlined,
+    this.emptyAction,
     this.errorTitle = 'Could not load recipes',
   });
 
@@ -29,6 +30,10 @@ class RecipeAsyncList extends StatelessWidget {
   final IconData emptyIcon;
   final String emptyTitle;
   final String emptyMessage;
+
+  /// Offered next to the empty state. The feed uses it to get out of a search with no results,
+  /// which is otherwise a dead end on a list that is genuinely empty.
+  final Widget? emptyAction;
   final String errorTitle;
 
   @override
@@ -41,6 +46,7 @@ class RecipeAsyncList extends StatelessWidget {
                 icon: emptyIcon,
                 title: emptyTitle,
                 message: emptyMessage,
+                action: emptyAction,
               )
             : _RecipeList(recipes: list, onTap: onTap),
         loading: () => const Center(child: CircularProgressIndicator()),

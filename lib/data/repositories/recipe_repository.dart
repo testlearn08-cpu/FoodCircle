@@ -10,7 +10,21 @@ abstract class RecipeRepository {
   ///
   /// Pagination is keyset-based on `created_at` (see migration 004's partial index) rather than
   /// OFFSET, so a recipe added while someone is scrolling cannot make them see a duplicate.
-  Future<List<Recipe>> fetchFeed({int limit = 20, DateTime? before});
+  ///
+  /// [query] is a case-insensitive substring match against the title **or any ingredient**, and
+  /// [tag] is an exact tag match. Both are optional and combine; either one present means the
+  /// filtering happens in the database, because matching a substring of one element of a
+  /// `text[]` is not something a PostgREST filter can express — see
+  /// `supabase/migrations/006_recipe_search.sql`.
+  ///
+  /// The two implementations are required to agree: a query of `50%` matches the literal text
+  /// `50%` in both, rather than acting as a LIKE wildcard.
+  Future<List<Recipe>> fetchFeed({
+    int limit = 20,
+    DateTime? before,
+    String? query,
+    String? tag,
+  });
 
   /// A single recipe. Returns null when it does not exist *or* when the reader is not allowed
   /// to see it — the policies make those indistinguishable on purpose, and a UI that needs to

@@ -107,6 +107,8 @@ class RecipeDetailScreen extends ConsumerWidget {
     // The row is gone, so anything that listed it — or pointed at it — is stale. Named
     // individually rather than invalidating the whole family, because only these are affected.
     ref.invalidate(feedProvider);
+    // The chips are derived from the feed, so a deleted recipe can remove a tag.
+    ref.invalidate(feedTagsProvider);
     ref.invalidate(myRecipesProvider(recipe.authorId));
     ref.invalidate(recipeByIdProvider(recipe.id));
 

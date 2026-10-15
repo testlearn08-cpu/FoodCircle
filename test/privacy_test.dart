@@ -18,6 +18,7 @@ void main() {
   late String schema;
   late String indexesAndTriggers;
   late String authHelpers;
+  late String searchMigration;
 
   setUpAll(() {
     String readMigration(String name) {
@@ -32,6 +33,7 @@ void main() {
     schema = readMigration('001_initial_schema.sql');
     indexesAndTriggers = readMigration('002_indexes_and_triggers.sql');
     authHelpers = readMigration('003_auth_helpers.sql');
+    searchMigration = readMigration('006_recipe_search.sql');
   });
 
   group('Row Level Security is enabled', () {
@@ -182,6 +184,28 @@ void main() {
         authHelpers,
         contains('revoke all on function public.handle_new_user() from public'),
       );
+    });
+  });
+
+  group('search is not a second authorization boundary', () {
+    test('runs as the caller, so the policies decide what it returns', () {
+      expect(searchMigration, contains('security invoker'));
+      // An empty search_path plus schema-qualified identifiers, the same hardening 003 applies
+      // to the signup trigger: nobody can shadow `public.recipes` with an object they control.
+      expect(searchMigration, contains("set search_path = ''"));
+
+      // The visibility rule must live in the policies and nowhere else — one boundary is
+      // debuggable, two that disagree are not. These are negative *and scoped to this file*,
+      // which is what check_sql_expectations.py's negative checks had to learn: 001 spells out
+      // `is_public` and `auth.uid()` on purpose, and 003 is a SECURITY DEFINER function.
+      expect(searchMigration, isNot(contains('is_public')));
+      expect(searchMigration, isNot(contains('auth.uid')));
+      expect(searchMigration, isNot(contains('security definer')));
+    });
+
+    test('creates no view', () {
+      expect(searchMigration, isNot(contains('create view')));
+      expect(searchMigration, isNot(contains('create or replace view')));
     });
   });
 

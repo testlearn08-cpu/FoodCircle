@@ -123,8 +123,10 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
           ? await repository.create(draft)
           : await repository.update(existing.id, draft);
 
-      // Everything that could have been showing the old version of this row.
+      // Everything that could have been showing the old version of this row, including the tag
+      // chips: an edit is how a tag appears or disappears.
       ref.invalidate(feedProvider);
+      ref.invalidate(feedTagsProvider);
       ref.invalidate(myRecipesProvider(saved.authorId));
       ref.invalidate(recipeByIdProvider(saved.id));
 

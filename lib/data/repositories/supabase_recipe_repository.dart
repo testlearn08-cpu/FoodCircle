@@ -17,13 +17,43 @@ class SupabaseRecipeRepository implements RecipeRepository {
   static const String _table = 'recipes';
 
   @override
-  Future<List<Recipe>> fetchFeed({int limit = 20, DateTime? before}) async {
-    var query = _client.from(_table).select().eq('is_public', true);
-    if (before != null) {
-      query = query.lt('created_at', before.toUtc().toIso8601String());
+  Future<List<Recipe>> fetchFeed({
+    int limit = 20,
+    DateTime? before,
+    String? query,
+    String? tag,
+  }) async {
+    final String needle = (query ?? '').trim();
+
+    // Anything the filters can express sends the query to the database instead: matching a
+    // substring of one element of the ingredients array is not something a PostgREST filter can
+    // do, and the visibility rule has to stay in one place (the policies). See
+    // supabase/migrations/006_recipe_search.sql.
+    if (needle.isNotEmpty || tag != null) {
+      final dynamic result = await _client.rpc(
+        'search_recipes',
+        params: <String, dynamic>{
+          'q': needle.isEmpty ? null : needle,
+          'tag': tag,
+          'before': before?.toUtc().toIso8601String(),
+          'max_rows': limit,
+        },
+      );
+
+      final List<dynamic> rows = result is List ? result : const <dynamic>[];
+      return _withAuthors(<Map<String, dynamic>>[
+        for (final row in rows) Map<String, dynamic>.from(row as Map),
+      ]);
     }
 
-    final rows = await query.order('created_at', ascending: false).limit(limit);
+    var queryBuilder = _client.from(_table).select().eq('is_public', true);
+    if (before != null) {
+      queryBuilder =
+          queryBuilder.lt('created_at', before.toUtc().toIso8601String());
+    }
+
+    final rows =
+        await queryBuilder.order('created_at', ascending: false).limit(limit);
     return _withAuthors(rows);
   }
 

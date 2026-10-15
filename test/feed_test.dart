@@ -19,7 +19,12 @@ class _FailingRepository implements RecipeRepository {
   int calls = 0;
 
   @override
-  Future<List<Recipe>> fetchFeed({int limit = 20, DateTime? before}) async {
+  Future<List<Recipe>> fetchFeed({
+    int limit = 20,
+    DateTime? before,
+    String? query,
+    String? tag,
+  }) async {
     calls++;
     throw StateError('the network is on fire');
   }

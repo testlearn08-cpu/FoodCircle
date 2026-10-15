@@ -111,14 +111,35 @@ class InMemoryRecipeRepository implements RecipeRepository {
   int _created = 0;
 
   @override
-  Future<List<Recipe>> fetchFeed({int limit = 20, DateTime? before}) async {
+  Future<List<Recipe>> fetchFeed({
+    int limit = 20,
+    DateTime? before,
+    String? query,
+    String? tag,
+  }) async {
+    // Mirrors public.search_recipes (migration 006) row for row, including the parts that are
+    // easy to get subtly wrong: `contains` on lowercased text has the same meaning as the
+    // function's escaped `ilike '%needle%'`, and a tag is an exact match in both.
+    final String needle = (query ?? '').trim().toLowerCase();
+
     final visible = _recipes
         .where((recipe) => recipe.isPublic || recipe.authorId == currentUserId)
         .where((recipe) => before == null || recipe.createdAt.isBefore(before))
+        .where((recipe) => tag == null || recipe.tags.contains(tag))
+        .where((recipe) => _matchesText(recipe, needle))
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     return List<Recipe>.unmodifiable(visible.take(limit));
+  }
+
+  /// Whether [needle] appears in the title or in any ingredient. A blank needle matches
+  /// everything: that is "no text filter", not "match nothing".
+  static bool _matchesText(Recipe recipe, String needle) {
+    if (needle.isEmpty) return true;
+    if (recipe.title.toLowerCase().contains(needle)) return true;
+    return recipe.ingredients
+        .any((ingredient) => ingredient.toLowerCase().contains(needle));
   }
 
   @override
