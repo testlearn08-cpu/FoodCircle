@@ -39,8 +39,14 @@ checks. If the model changes, those checks are the specification of what changes
 |---|---|---|
 | Three top-level destinations: Feed, Recipes, Profile | `lib/navigation/responsive_shell.dart` | `kNavigationDestinations` is the single source for the rail and the bottom bar, so adding/removing a destination is one list plus one branch in `lib/app.dart`. |
 | Feed = public recipes, newest first | `lib/features/feed/feed_screen.dart` | If "Feed" means something else (activity, nearby, a circle), the screen is a rewrite but the repository/provider shape survives. |
-| Recipe detail, recipe editor, search are Phase 2 | roadmap | — |
-| Sign-in is email + password, and browsing public recipes is allowed signed out | *not built yet* | **⚠️ Confirm before building Phase 1b.** If onboarding begins with a location permission, or if auth is phone/OTP or anonymous-first, the first-run flow differs from "land on the feed". |
+| **`/recipes` is "the recipes you wrote"** — a personal recipe box, private rows included, not a browse-all-recipes catalogue | `lib/features/recipes/my_recipes_screen.dart` (2026-10-15) | Renaming or re-scoping is one screen plus one branch in `lib/app.dart`; `fetchMine` already exists. **⚠️ This is the most contentions inference in this list:** the destination is labelled "Recipes", and the handoff may well mean a catalogue, a category browser or a circle-scoped list. The feed is public recipes, so a second browse-all list would be near-duplicate — which is *why* this was read as "mine", not proof that it is. |
+| A recipe page belongs to whichever list you opened it from (`/feed/:id` and `/recipes/:id` both route to it) | `lib/app.dart` | If `01` specifies one canonical URL per recipe, collapse to one route; nothing else changes. |
+| A recipe that is unreadable and a recipe that does not exist are treated identically ("Recipe not available") | `lib/features/recipes/recipe_detail_screen.dart` | Deliberate: distinguishing them would leak the existence of other people's private recipes. Would only change if `06` asks for a different disclosure policy. |
+| Editor input limits mirror the database's `CHECK` constraints (title 1–120, servings 1–100, times 0–1440, ≤10 tags) | `lib/features/recipes/recipe_editor_screen.dart`, `supabase/migrations/004` | These are the database's numbers, not a product decision — `01`/`07` may want different ones, in which case both places change together. |
+| Editing a recipe cannot change its image | `recipe_editor_screen.dart`, `in_memory_recipe_repository.dart`, `supabase_recipe_repository.dart` | An omission, not a rule: uploads need `005_storage.sql`. Both repositories deliberately preserve `image_url` on update so the omission is reversible. |
+| Recipe detail and the editor exist; **search does not** | `lib/features/`, roadmap | — |
+| Sign-in is email + password, and browsing public recipes is allowed signed out | *not built yet*; the app has a signed-out mode ("Not signed in") but no way to sign in | **⚠️ Confirm before building Phase 1b.** If onboarding begins with a location permission, or if auth is phone/OTP or anonymous-first, the first-run flow differs from "land on the feed". **PR #5 (`arena/b4829743-foodcircle`) is an open, green attempt at exactly this**, so coordinate rather than re-derive. |
+| Editing your profile is not built, and a profile is read-only | `lib/features/profile/profile_screen.dart` | `profiles_update_own` and `Profile.toUpdateJson` support it server-side; the screen omits it because avatar upload needs `005`. |
 | No onboarding, no permissions, no settings beyond sign-out | *not built yet* | **⚠️** `05` and `01` may specify an onboarding sequence. |
 
 ## 4. Things my spec does not mention at all (settled by `05`, `04`)
@@ -63,7 +69,7 @@ addresses them:
 | Current state | Question for the handoff |
 |---|---|
 | CI is the only place this code is ever compiled; its logs, artifacts and web preview are published to `ci-artifacts` / `ci-scaffold` / `preview` branches (see `README.md`) | Does `08` mandate a workflow this conflicts with? |
-| 42 tests: navigation, policy text, behavioural RLS, models, repository, feed | Does `07` define a coverage or acceptance bar that is higher? |
+| 55 tests: navigation, policy text, behavioural RLS, models, repository, feed, recipe page, editor, profile (green run [38686317095](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38686317095)) | Does `07` define a coverage or acceptance bar that is higher? |
 | No environments, no deploy target, no secrets management | `09` defines them; the `--dart-define` contract in `lib/core/config/env.dart` is the current guess. |
 | `main` is the default branch; work happens on `arena/*` | `08` may specify a different branching model. |
 
