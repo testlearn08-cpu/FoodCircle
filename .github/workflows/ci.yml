@@ -1,0 +1,441 @@
+name: CI
+
+# Why this workflow looks the way it does
+# ---------------------------------------
+# Development happens from a sandbox that has NO Flutter SDK (pub.dev and the SDK download
+# hosts are unreachable) and that CANNOT read Actions job logs (they redirect to
+# results-receiver.actions.githubusercontent.com, which is also unreachable). GitHub Actions
+# is therefore the only compiler, test runner and build host for this repo.
+#
+# Two consequences are baked in:
+#
+#   1. Every job tees its output into `ci-logs/` and the `publish-logs` job pushes those
+#      logs to the orphan branch `ci-artifacts`, which the sandbox fetches with git. Without
+#      this a red run reports exactly one bit of information (that it was red) and debugging
+#      is guesswork.
+#   2. Build output is published to force-pushed orphan branches (`preview` for the web
+#      build, `ci-scaffold` for generated platform files), because `gh run download` is
+#      blocked as well. Never merge those branches; the next run overwrites them.
+#
+# If you have a local Flutter SDK, `flutter analyze` / `flutter test` still work exactly as
+# they always did — this workflow is an addition, not a replacement.
+
+on:
+  push:
+    # `arena/**` is where the automation works; `main` is the integration branch.
+    branches: [main, 'arena/**']
+  pull_request:
+  workflow_dispatch:
+
+# Required by publish-logs / build-web / scaffold to push the bot branches above.
+permissions:
+  contents: write
+
+# Never cancel a run in flight: a cancelled run skips its publish jobs, and a stale
+# `preview` / `ci-artifacts` branch is worse than a slow one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Public repository, and a service_role key in it is a full database compromise: it bypasses
+  # every RLS policy, which is the only authorization boundary this app has. Runs first and in
+  # seconds because it is the one job whose failure should stop everything else.
+  secrets:
+    name: No credentials committed
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for committed credentials
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          python3 tool/check_no_secrets.py 2>&1 | tee "$LOGS_DIR/secrets.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-secrets
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Fast source-level guardrails for the inferred auth routes and client-key boundary. This is
+  # not a Dart parser or compile gate; the Flutter job remains authoritative for compilation.
+  dart-static:
+    name: Dart static guardrails
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check auth routing and key boundaries
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          python3 tool/check_dart_static.py 2>&1 | tee "$LOGS_DIR/dart-static.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-dart-static
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Mirrors the migration assertions in test/privacy_test.dart. This is a fast text guard, not a
+  # substitute for the behavioral PostgreSQL job below.
+  sql-expectations:
+    name: SQL expectations
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SQL expectations
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          python3 tool/check_sql_expectations.py 2>&1 | tee "$LOGS_DIR/sql-expectations.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-sql-expectations
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Applies the migrations to a real PostgreSQL and exercises the policies as the roles a
+  # client actually gets (anon / authenticated / service_role), with a JWT claim set.
+  #
+  # test/privacy_test.dart only proves the policy TEXT still says what it should; this proves
+  # the policies BEHAVE. Without it, a policy could deny everything, or allow everything, and
+  # every other check in this repo would still be green.
+  db-behaviour:
+    name: Database behaviour (RLS)
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make sure psql is available
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          fi
+          psql --version 2>&1 | tee "$LOGS_DIR/psql-client.log"
+      - name: Apply migrations and run the behavioural RLS suite
+        run: |
+          set -o pipefail
+          bash supabase/tests/run.sh 2>&1 | tee "$LOGS_DIR/db-behaviour.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-db-behaviour
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The real compile/test gate. Each step is teed to its own log file, so a failure inside
+  # the sandbox is diagnosable from `ci-artifacts` without access to the Actions UI.
+  flutter:
+    name: Flutter analyze + test
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: flutter --version
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          flutter --version 2>&1 | tee "$LOGS_DIR/flutter-version.log"
+      - name: flutter pub get
+        run: |
+          set -o pipefail
+          flutter pub get 2>&1 | tee "$LOGS_DIR/pub-get.log"
+      - name: flutter analyze
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee "$LOGS_DIR/analyze.log"
+      - name: flutter test
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded 2>&1 | tee "$LOGS_DIR/test.log"
+      - name: dart format check
+        run: |
+          set -o pipefail
+          dart format --output=none --set-exit-if-changed . 2>&1 | tee "$LOGS_DIR/format.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-flutter
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Generates the platform scaffolding the repo is missing (9 of the 13 files the Flutter
+  # tool and the Android/iOS toolchains require are absent, so nothing is buildable today).
+  #
+  # It NEVER runs against the repository copy: it works in /tmp on a copy, reports exactly
+  # what `flutter create` would add or change, and publishes that tree to the `ci-scaffold`
+  # branch. The generated files are then reviewed and committed deliberately — an
+  # unreviewed `flutter create` in-repo would also drop a counter-app widget_test.dart that
+  # fails against this app.
+  scaffold:
+    name: Scaffolding report
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate scaffolding in a copy of the repo
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          cp -r "$GITHUB_WORKSPACE" /tmp/gen
+          rm -rf /tmp/gen/.git /tmp/gen/ci-logs
+          cd /tmp/gen
+          # NOTE: `flutter create` preserves files that already exist, so anything the repo
+          # ships in a stale form (AndroidManifest.xml, web/index.html, .gitignore) is NOT
+          # corrected here. The pristine reference app below is what those are compared to.
+          flutter create --platforms=android,ios,web \
+            --org com.foodcircle --project-name foodcircle . \
+            2>&1 | tee "$LOGS_DIR/scaffold-generate.log"
+          # The default template test drives a counter app; it would fail here, so it is
+          # removed before the tree is published.
+          rm -f test/widget_test.dart
+          # Formatting is not a gate yet, so this is where the formatter's output is
+          # produced: the published branch carries the canonically formatted Dart files.
+          dart format . 2>&1 | tee "$LOGS_DIR/scaffold-format.log"
+      - name: Generate a pristine reference app (the current template, unmodified)
+        run: |
+          set -o pipefail
+          flutter create --platforms=android,ios,web \
+            --org com.foodcircle --project-name foodcircle /tmp/vanilla \
+            2>&1 | tee "$LOGS_DIR/scaffold-vanilla.log"
+          rm -f /tmp/vanilla/test/widget_test.dart
+      - name: Report what the scaffolding adds or changes
+        run: |
+          cd /tmp/gen
+          {
+            echo "### Files present in the generated tree but not in the repo"
+            diff -rq --exclude=.git --exclude=build --exclude=.dart_tool --exclude=ci-logs \
+              "$GITHUB_WORKSPACE" /tmp/gen | grep "^Only in /tmp/gen" | sed 's|^Only in /tmp/gen|ADDED |'
+            echo
+            echo "### Files that differ from the repo"
+            diff -rq --exclude=.git --exclude=build --exclude=.dart_tool --exclude=ci-logs \
+              "$GITHUB_WORKSPACE" /tmp/gen | grep " differ$" | sed 's|/tmp/gen|<generated>|'
+          } > "$LOGS_DIR/scaffold-diff.log" 2>&1 || true
+          cat "$LOGS_DIR/scaffold-diff.log"
+      - name: Publish the generated tree to the ci-scaffold branch
+        run: |
+          cd /tmp/gen
+          # The pristine template app is published under vanilla/ so that files the repo
+          # already ships in a stale form can be diffed against what Flutter 3.47 actually
+          # generates (see the scaffolding note above).
+          mkdir -p vanilla
+          cp -r /tmp/vanilla/android /tmp/vanilla/ios /tmp/vanilla/web \
+                /tmp/vanilla/.metadata /tmp/vanilla/analysis_options.yaml \
+                /tmp/vanilla/pubspec.yaml vanilla/
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b ci-scaffold
+          git add -A
+          git commit -q -m "flutter create scaffolding for ${GITHUB_SHA:0:7} (${GITHUB_REF_NAME})"
+          git push -q -f \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" \
+            ci-scaffold
+          echo "published ci-scaffold" | tee "$LOGS_DIR/scaffold-publish.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-scaffold
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Produces the only way a human can actually LOOK at this app from the sandbox: a real
+  # `flutter build web` published to the `preview` branch, which gets fetched and served.
+  build-web:
+    name: Build web + publish preview
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: flutter pub get
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          flutter pub get 2>&1 | tee "$LOGS_DIR/pub-get-web.log"
+      - name: flutter build web --release
+        run: |
+          set -o pipefail
+          flutter build web --release 2>&1 | tee "$LOGS_DIR/build-web.log"
+      # Pull requests build the bundle but do not publish it. Every `arena/**` push fires two
+      # runs of the same commit — this workflow on the branch, and again on the PR's merge ref —
+      # and both of them used to force-push `preview`. Two force-pushes to one ref race, and the
+      # loser fails the job having proved nothing: run 38694457685 went red with a green
+      # `flutter build web --release` above it. The branch's own push run is the publisher; the
+      # PR run still builds, so a broken web build still fails the PR.
+      - name: Publish build/web to the preview branch
+        if: github.event_name != 'pull_request'
+        run: |
+          cd build/web
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b preview
+          git add -A
+          git commit -q -m "web preview: ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7} (run ${GITHUB_RUN_ID})"
+          git push -q -f \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" \
+            preview
+          du -sh . | tee "$LOGS_DIR/preview-size.log"
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-build-web
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Proves the Android target actually builds (the repo has no MainActivity, no gradle
+  # wrapper and no res/ today). The APK is attached to the run for manual sideloading.
+  build-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    env:
+      LOGS_DIR: ${{ github.workspace }}/ci-logs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: flutter pub get
+        run: |
+          mkdir -p "$LOGS_DIR"
+          set -o pipefail
+          flutter pub get 2>&1 | tee "$LOGS_DIR/pub-get-apk.log"
+      - name: java --version
+        run: |
+          set -o pipefail
+          java -version 2>&1 | tee "$LOGS_DIR/java-version.log" || true
+      - name: flutter build apk --debug
+        run: |
+          set -o pipefail
+          flutter build apk --debug 2>&1 | tee "$LOGS_DIR/build-apk.log"
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foodcircle-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-build-apk
+          path: ci-logs/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Collects every job's log onto the `ci-artifacts` branch: one commit per run, readable
+  # from the sandbox with `git fetch origin ci-artifacts && git show origin/ci-artifacts:RUN.md`.
+  publish-logs:
+    name: Publish logs to ci-artifacts
+    runs-on: ubuntu-latest
+    needs: [secrets, dart-static, sql-expectations, db-behaviour, flutter, scaffold, build-web, build-apk]
+    if: always() && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: publish
+          pattern: logs-*
+          merge-multiple: true
+      - name: Write the run manifest
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" > publish/needs.json
+          python3 - <<'PY'
+          import json, os, pathlib
+
+          needs = json.loads(os.environ["NEEDS"])
+          lines = [
+              f"# CI run {os.environ['GITHUB_RUN_ID']}",
+              "",
+              f"- repository: {os.environ['GITHUB_REPOSITORY']}",
+              f"- ref: {os.environ['GITHUB_REF']} ({os.environ['GITHUB_REF_NAME']})",
+              f"- commit: {os.environ['GITHUB_SHA']}",
+              f"- event: {os.environ['GITHUB_EVENT_NAME']}",
+              f"- url: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+              f"/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "",
+              "| job | result |",
+              "| --- | --- |",
+          ]
+          for job, info in needs.items():
+              lines.append(f"| {job} | {info.get('result')} |")
+          lines += ["", "## Log files in this branch", ""]
+          for p in sorted(pathlib.Path("publish").rglob("*.log")):
+              size = p.stat().st_size
+              lines.append(f"- `{p}` ({size} bytes)")
+          pathlib.Path("publish/RUN.md").write_text("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          PY
+      - name: Push the logs branch
+        run: |
+          cd publish
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b ci-artifacts
+          git add -A
+          git commit -q -m "CI logs for ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7} (run ${GITHUB_RUN_ID})"
+          git push -q -f \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" \
+            ci-artifacts
+          echo "published ci-artifacts"
