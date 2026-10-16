@@ -43,8 +43,8 @@
   `repositories/`: the auth and recipe interfaces, their Supabase adapters, and the
   in-memory fakes the demo build and the widget tests run on.
 - `lib/features/` — `feed/` (public recipes), `recipes/` (recipe page, recipe box,
-  editor), `profile/` (identity, your recipe box, sign-out), `auth/` (sign-in,
-  sign-up).
+  editor), `profile/` (identity, the profile editor, your recipe box, sign-out),
+  `auth/` (sign-in, sign-up).
 - `android/app/` — Android manifest and build config.
 - `ios/Runner/` — iOS runner assets and config placeholders.
 - `web/index.html` — web entry that boots the generated `flutter_bootstrap.js`.
