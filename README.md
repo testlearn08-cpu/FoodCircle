@@ -14,9 +14,9 @@ approved, and `docs/handoff/RECONCILIATION.md` lists what still needs the real d
 - ✅ **Builds on every platform target, and its test suite passes** — in CI, every job in
   [38862331246](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38862331246):
   `flutter build web --release` publishes a runnable web bundle,
-  `flutter build apk --debug` produces an installable Android APK, 98 tests pass, `analyze` reports
-  no issues, `dart format` has 0 changes, and the 32 behavioural database checks pass against a real
-  `postgres:17`.
+  `flutter build apk --debug` produces an installable Android APK, 111 tests pass, `analyze`
+  reports no issues, `dart format` has 0 changes, and the 33 behavioural database checks pass
+  against a real `postgres:17`.
 - ✅ Responsive navigation shell works: three top-level destinations (`/feed`, `/recipes`,
   `/profile`) with a desktop rail, tablet rail and mobile bottom bar, each with its own
   navigation stack.
@@ -42,7 +42,9 @@ approved, and `docs/handoff/RECONCILIATION.md` lists what still needs the real d
 - ✅ **All three destinations are real.** `/feed` lists public recipes, `/recipes` is your own
   recipe box (private ones included), and `/profile` is your identity — and tapping a recipe opens
   its page, with ingredients, steps, and delete for its author. A recipe can be written from the
-  app too: `/recipes/new` and `/recipes/:id/edit` share one validated form.
+  app too: `/recipes/new` and `/recipes/:id/edit` share one validated form. Your profile is
+  editable in place: name, username and bio at `/profile/edit`, with a taken username explained
+  rather than swallowed.
 - ✅ **Search works, including inside ingredient lists.** The feed's search box matches titles and
   ingredients, with tag chips built from the tags actually present. That filtering runs in the
   database (`006_recipe_search.sql`), because a substring of one element of a `text[]` is not
@@ -107,8 +109,8 @@ dispatch:
 | `No credentials committed` | No `service_role` key, personal access token or private key is in the repository. It is public, and a leaked `service_role` key bypasses every RLS policy. |
 | `Dart static guardrails` | Public-feed/auth-route boundaries, auth-state refresh, and publishable-key wiring remain present. |
 | `SQL expectations` | The RLS policies and the `auth.users` leak guard still exist as written (python3, ~5s). |
-| `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 32 checks as `anon` / `authenticated` / `service_role`, covering the recipe and profile policies, the public image bucket's owner-folder writes, and the checks that prove a search cannot see past the visibility rule. |
-| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean (42 files, 0 changed), and 98 tests pass. |
+| `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 33 checks as `anon` / `authenticated` / `service_role`, covering the recipe and profile policies, the public image bucket's owner-folder writes, and the checks that prove a search cannot see past the visibility rule. |
+| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean (44 files, 0 changed), and 111 tests pass. |
 | `Scaffolding report` | Diffs the repo against what `flutter create` generates, and publishes a pristine reference app to `ci-scaffold`. |
 | `Build web + publish preview` | `flutter build web --release` succeeds, and a run that is not a pull request force-pushes the bundle to the `preview` branch. PR runs build it without publishing, so a broken web build still fails the PR. |
 | `Build debug APK` | The Android target really builds; the APK is attached to the run. |
@@ -147,7 +149,7 @@ lib/data/                         models + repositories (Supabase and in-memory)
 lib/features/auth/                sign-in and sign-up
 lib/features/feed/                the public feed
 lib/features/recipes/             recipe page, recipe box, editor
-lib/features/profile/             identity, your recipe box, sign out
+lib/features/profile/             identity, profile editor, your recipe box, sign out
 supabase/migrations/              001 schema · 002 indexes+triggers · 003 auth helpers · 004 metadata · 005 storage · 006 search
 supabase/tests/                   behavioural RLS suite, migration-upgrade test, auth/storage stubs
 test/                             navigation, policies, models, repositories, feed, detail, editor, profile, auth, search

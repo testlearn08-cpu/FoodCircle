@@ -9,6 +9,7 @@ import 'data/repositories/auth_repository.dart';
 import 'features/auth/sign_in_screen.dart';
 import 'features/auth/sign_up_screen.dart';
 import 'features/feed/feed_screen.dart';
+import 'features/profile/profile_editor_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/recipes/my_recipes_screen.dart';
 import 'features/recipes/recipe_detail_screen.dart';
@@ -157,6 +158,14 @@ class _FoodCircleAppState extends ConsumerState<FoodCircleApp> {
                 GoRoute(
                   path: kProfilePath,
                   builder: (context, state) => const ProfileScreen(),
+                  routes: [
+                    // Guarded by `requiresAuthenticatedUser`, which covers `/profile/**`: an
+                    // editor for a row you do not own is not a screen to render.
+                    GoRoute(
+                      path: 'edit',
+                      builder: (context, state) => const EditProfileScreen(),
+                    ),
+                  ],
                 ),
               ],
             ),

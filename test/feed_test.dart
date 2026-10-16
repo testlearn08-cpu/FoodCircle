@@ -41,6 +41,10 @@ class _FailingRepository implements RecipeRepository {
   Future<Profile?> fetchProfile(String id) async => throw UnimplementedError();
 
   @override
+  Future<Profile> updateProfile(ProfileDraft draft) async =>
+      throw UnimplementedError();
+
+  @override
   Future<Recipe> create(RecipeDraft draft) async => throw UnimplementedError();
 
   @override

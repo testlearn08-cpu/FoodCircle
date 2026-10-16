@@ -95,6 +95,26 @@ class SupabaseRecipeRepository implements RecipeRepository {
   }
 
   @override
+  Future<Profile> updateProfile(ProfileDraft draft) async {
+    try {
+      final row = await _client
+          .from('profiles')
+          .update(draft.toUpdateJson())
+          .eq('id', draft.id)
+          .select()
+          .single();
+      return Profile.fromJson(row);
+    } on PostgrestException catch (error) {
+      // 23505 is the unique violation on `profiles.username`. Anything else is not something
+      // this screen can explain, so it travels on unchanged.
+      if (error.code == '23505') {
+        throw const ProfileUpdateFailure('That username is taken.');
+      }
+      rethrow;
+    }
+  }
+
+  @override
   Future<String> uploadImage(RecipeImageUpload upload) async {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) {
