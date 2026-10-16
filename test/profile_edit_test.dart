@@ -213,7 +213,8 @@ void main() {
 
       expect(find.byKey(const Key('profile-edit')), findsOneWidget);
       expect(
-        tester.widget<IconButton>(find.byKey(const Key('profile-edit')))
+        tester
+            .widget<IconButton>(find.byKey(const Key('profile-edit')))
             .onPressed,
         isNotNull,
       );

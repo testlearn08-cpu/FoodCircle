@@ -41,9 +41,8 @@ class ProfileScreen extends ConsumerWidget {
             key: const Key('profile-edit'),
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Edit profile',
-            onPressed: userId == null
-                ? null
-                : () => context.push('/profile/edit'),
+            onPressed:
+                userId == null ? null : () => context.push('/profile/edit'),
           ),
         ],
       ),

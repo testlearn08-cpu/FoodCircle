@@ -82,9 +82,8 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
     );
 
     try {
-      final Profile saved = await ref
-          .read(recipeRepositoryProvider)
-          .updateProfile(draft);
+      final Profile saved =
+          await ref.read(recipeRepositoryProvider).updateProfile(draft);
 
       // A profile is denormalised into every recipe read through the feed — `_withAuthors`
       // copies the author's name onto each row — so the lists showing the old name have to be

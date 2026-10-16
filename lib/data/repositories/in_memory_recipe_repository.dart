@@ -160,8 +160,7 @@ class InMemoryRecipeRepository implements RecipeRepository {
     // gets a 23505 from; this is the same refusal, raised at the same point in the flow, so the
     // screen's handling of it is exercised by the demo build too.
     final bool taken = _profiles.values.any(
-      (profile) =>
-          profile.id != draft.id && profile.username == draft.username,
+      (profile) => profile.id != draft.id && profile.username == draft.username,
     );
     if (taken) {
       throw const ProfileUpdateFailure('That username is taken.');
