@@ -89,7 +89,7 @@ addresses them:
 | Current state | Question for the handoff |
 |---|---|
 | CI is the only place this code is ever compiled; its logs, artifacts and web preview are published to `ci-artifacts` / `ci-scaffold` / `preview` branches (see `README.md`) | Does `08` mandate a workflow this conflicts with? |
-| The Dart suite — navigation, policy text, behavioural RLS, models, repositories, feed, recipe page, editor, profile, auth, search — plus 32 database behaviour checks. The two halves were verified by [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443) (75 tests) and `38560095418` (58 tests); the merged tree reports its own counts. | Does `07` define a coverage or acceptance bar that is higher? |
+| 98 tests — navigation, policy text, behavioural RLS, models, repositories, feed, recipe page, editor, profile, auth, search — plus 32 behavioural database checks, all green in [38862331246](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38862331246) | Does `07` define a coverage or acceptance bar that is higher? |
 | No environments, no deploy target, no secrets management | `09` defines them; the `--dart-define` contract in `lib/core/config/env.dart` is the current guess. |
 | `main` is the default branch; work happens on `arena/*` | `08` may specify a different branching model. |
 

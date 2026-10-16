@@ -5,17 +5,18 @@ A responsive food-sharing community app — Flutter (Android / iOS / Web) on Sup
 
 ## Current status
 
-The repository contains the Phase 1a data/feed foundation plus an inferred Phase 1b/1c auth and
-recipe-image-storage implementation. The latter is being reconstructed from the repository's
-inferred roadmap because the authoritative handoff is not in this checkout; the new code is **not
-verified until its CI run passes**.
+One branch, integrated end to end: the Phase 1a data/feed foundation, the product surface built on
+it (recipe page, recipe box, editor, search, profile) and the inferred Phase 1b/1c auth and
+recipe-image-storage slice. The auth/storage slice is reconstructed from this repository's inferred
+roadmap because the authoritative handoff is not in this checkout — it is verified by CI, not
+approved, and `docs/handoff/RECONCILIATION.md` lists what still needs the real documents.
 
-- ✅ **Builds on every platform target, and its test suite passes** — in CI, all seven jobs:
-  `flutter build web --release` publishes a runnable web bundle, `flutter build apk --debug`
-  produces an installable Android APK, and the Dart suite (`analyze`, the tests, `dart format`) is
-  green. The two halves this branch merges were verified by
-  [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443) (75 tests)
-  and `38560095418` (58); the merged tree reports its own counts below.
+- ✅ **Builds on every platform target, and its test suite passes** — in CI, every job in
+  [38862331246](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38862331246):
+  `flutter build web --release` publishes a runnable web bundle,
+  `flutter build apk --debug` produces an installable Android APK, 98 tests pass, `analyze` reports
+  no issues, `dart format` has 0 changes, and the 32 behavioural database checks pass against a real
+  `postgres:17`.
 - ✅ Responsive navigation shell works: three top-level destinations (`/feed`, `/recipes`,
   `/profile`) with a desktop rail, tablet rail and mobile bottom bar, each with its own
   navigation stack.
@@ -107,7 +108,7 @@ dispatch:
 | `Dart static guardrails` | Public-feed/auth-route boundaries, auth-state refresh, and publishable-key wiring remain present. |
 | `SQL expectations` | The RLS policies and the `auth.users` leak guard still exist as written (python3, ~5s). |
 | `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 32 checks as `anon` / `authenticated` / `service_role`, covering the recipe and profile policies, the public image bucket's owner-folder writes, and the checks that prove a search cannot see past the visibility rule. |
-| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean, and the whole Dart suite passes. |
+| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean (42 files, 0 changed), and 98 tests pass. |
 | `Scaffolding report` | Diffs the repo against what `flutter create` generates, and publishes a pristine reference app to `ci-scaffold`. |
 | `Build web + publish preview` | `flutter build web --release` succeeds, and a run that is not a pull request force-pushes the bundle to the `preview` branch. PR runs build it without publishing, so a broken web build still fails the PR. |
 | `Build debug APK` | The Android target really builds; the APK is attached to the run. |

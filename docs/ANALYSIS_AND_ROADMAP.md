@@ -102,9 +102,15 @@ signed in as the demo author through a shared `test/support/demo_app.dart`. That
 same `InMemoryAuthRepository` the demo build uses, so those tests exercise the real guard rather
 than a stubbed one.
 
-Evidence: 32/32 behavioural checks pass locally against PostgreSQL 18.6 (PGlite) on the merged
-migrations *before* the push, and CI verifies the Dart suite plus the same 32 checks against
-`postgres:17`.
+Evidence: 32/32 behavioural checks passed locally against PostgreSQL 18.6 (PGlite) on the merged
+migrations *before* the push, and CI then verified the whole thing — all eight jobs green in
+[38862331246](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38862331246): 98 tests, `analyze` with no issues, `dart format` 0 changed out of 42 files, and the same
+32 checks passing against `postgres:17`.
+
+The first push was red in the three jobs that compile Dart, for two reasons and no others: a
+positional argument passed to a named-only constructor and a duplicated import, both in the
+hand-written part of the merge. `db-behaviour` was already green on that run — the SQL half of the
+merge never had a broken state.
 
 ---
 
