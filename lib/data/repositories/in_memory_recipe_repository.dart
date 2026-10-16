@@ -1,7 +1,6 @@
 import '../models/profile.dart';
 import '../models/recipe.dart';
 import '../models/recipe_image_upload.dart';
-import '../models/recipe_image_upload.dart';
 import 'recipe_repository.dart';
 
 /// The repository used when no Supabase project is configured, and by the widget tests.

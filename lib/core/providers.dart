@@ -80,7 +80,7 @@ class FeedQuery {
   FeedQuery copyWith({String? text, String? tag, bool clearTag = false}) =>
       FeedQuery(
         text: text ?? this.text,
-        clearTag ? null : (tag ?? this.tag),
+        tag: clearTag ? null : (tag ?? this.tag),
       );
 
   @override

@@ -1,7 +1,7 @@
 // Search, against the in-memory repository.
 //
 // These pin the contract that supabase/migrations/006_recipe_search.sql implements in SQL: the
-// two are required to agree, and the behavioural suite asserts the SQL half (checks 22-27) so a
+// two are required to agree, and the behavioural suite asserts the SQL half (checks 26-32) so a
 // disagreement between them fails CI rather than showing up as a user-visible difference between
 // the demo build and a connected one.
 
