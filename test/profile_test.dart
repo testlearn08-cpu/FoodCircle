@@ -7,33 +7,29 @@
 // so text that appears on two of them would otherwise be matched twice.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:foodcircle/app.dart';
-import 'package:foodcircle/core/providers.dart';
 import 'package:foodcircle/data/repositories/in_memory_recipe_repository.dart';
 import 'package:foodcircle/data/repositories/recipe_repository.dart';
+import 'package:foodcircle/features/auth/sign_in_screen.dart';
+import 'package:foodcircle/features/feed/feed_screen.dart';
 import 'package:foodcircle/features/profile/profile_screen.dart';
 import 'package:foodcircle/features/recipes/my_recipes_screen.dart';
 
+import 'support/demo_app.dart';
+
 const Size kPhone = Size(430, 900);
 
-Future<void> pumpAppAt(WidgetTester tester, RecipeRepository repository) async {
-  tester.view.physicalSize = kPhone;
-  tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
-
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: <Override>[
-        recipeRepositoryProvider.overrideWithValue(repository),
-      ],
-      child: const FoodCircleApp(),
-    ),
-  );
-  await tester.pumpAndSettle();
-}
+Future<void> pumpAppAt(
+  WidgetTester tester,
+  RecipeRepository repository, {
+  bool signedIn = true,
+}) =>
+    pumpFoodCircleApp(
+      tester,
+      repository: repository,
+      size: kPhone,
+      signedIn: signedIn,
+    );
 
 Future<void> tapDestination(WidgetTester tester, String label) async {
   await tester.tap(
@@ -95,43 +91,35 @@ void main() {
     );
   });
 
-  testWidgets('with no account the profile says so instead of guessing',
-      (tester) async {
-    // No demo identity: this is what a configured build looks like before sign-in works.
-    await pumpAppAt(tester, InMemoryRecipeRepository());
+  testWidgets('with no account the profile destination asks you to sign in', (
+    tester,
+  ) async {
+    // No session. `/profile` is the account's own destination, so the router sends you to
+    // sign-in rather than guessing who you are; the feed is unaffected and stays public.
+    await pumpAppAt(
+      tester,
+      InMemoryRecipeRepository(),
+      signedIn: false,
+    );
+
+    expect(find.byType(FeedScreen), findsOneWidget);
 
     await tapDestination(tester, 'Profile');
-    expect(
-      find.descendant(
-        of: find.byType(ProfileScreen),
-        matching: find.text('Not signed in'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byType(ProfileScreen),
-        matching: find.text('@ana_cooks'),
-      ),
-      findsNothing,
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(find.byType(ProfileScreen), findsNothing);
+  });
+
+  testWidgets('with no account the recipe box asks you to sign in as well', (
+    tester,
+  ) async {
+    await pumpAppAt(
+      tester,
+      InMemoryRecipeRepository(),
+      signedIn: false,
     );
 
     await tapDestination(tester, 'Recipes');
-    expect(find.byType(MyRecipesScreen), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(MyRecipesScreen),
-        matching: find.text('Not signed in'),
-      ),
-      findsOneWidget,
-    );
-    // Nothing to add a recipe to, so no way to start one.
-    expect(
-      find.descendant(
-        of: find.byType(MyRecipesScreen),
-        matching: find.text('New recipe'),
-      ),
-      findsNothing,
-    );
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(find.byType(MyRecipesScreen), findsNothing);
   });
 }

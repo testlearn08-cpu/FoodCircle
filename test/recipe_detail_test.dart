@@ -5,39 +5,26 @@
 // assertion here is scoped to the screen it is about.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:foodcircle/app.dart';
-import 'package:foodcircle/core/providers.dart';
 import 'package:foodcircle/data/repositories/in_memory_recipe_repository.dart';
 import 'package:foodcircle/data/repositories/recipe_repository.dart';
 import 'package:foodcircle/features/feed/feed_screen.dart';
 import 'package:foodcircle/features/recipes/recipe_detail_screen.dart';
 
+import 'support/demo_app.dart';
+
 /// Phone width, and tall enough that the whole page is laid out without scrolling: these tests
 /// are about what the screen says, not about how far down it is.
 const Size kPhone = Size(430, 1600);
 
+/// The app, signed in as the author of the seeded recipes: the recipe box and the author-only
+/// delete action both depend on who the app is acting as.
 Future<void> pumpAppAt(
   WidgetTester tester,
   RecipeRepository repository, [
   Size size = kPhone,
-]) async {
-  tester.view.physicalSize = size;
-  tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
-
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: <Override>[
-        recipeRepositoryProvider.overrideWithValue(repository),
-      ],
-      child: const FoodCircleApp(),
-    ),
-  );
-  await tester.pumpAndSettle();
-}
+]) =>
+    pumpFoodCircleApp(tester, repository: repository, size: size);
 
 /// Text on the page being tested, ignoring identical text on whatever is behind it.
 Finder onDetail(String text) => find.descendant(

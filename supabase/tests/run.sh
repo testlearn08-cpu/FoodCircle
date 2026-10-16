@@ -76,6 +76,7 @@ echo
 echo "== phase 2: fresh database =="
 psql_run -q -c 'drop schema if exists public cascade; create schema public;'
 psql_run -q -c 'drop schema if exists auth cascade;'
+psql_run -q -c 'drop schema if exists storage cascade;'
 
 apply supabase/tests/00_auth_stub.sql
 for migration in "${all_migrations[@]}"; do apply "$migration"; done

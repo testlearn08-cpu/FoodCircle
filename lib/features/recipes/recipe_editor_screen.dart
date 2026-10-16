@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
-import '../../core/session.dart';
 import '../../core/widgets/state_views.dart';
 import '../../data/models/recipe.dart';
 import '../../data/repositories/recipe_repository.dart';

@@ -12,6 +12,7 @@ import 'package:foodcircle/core/config/env.dart';
 import 'package:foodcircle/core/providers.dart';
 import 'package:foodcircle/data/models/profile.dart';
 import 'package:foodcircle/data/models/recipe.dart';
+import 'package:foodcircle/data/models/recipe_image_upload.dart';
 import 'package:foodcircle/data/repositories/in_memory_recipe_repository.dart';
 import 'package:foodcircle/data/repositories/recipe_repository.dart';
 
@@ -44,6 +45,10 @@ class _FailingRepository implements RecipeRepository {
 
   @override
   Future<Recipe> update(String id, RecipeDraft draft) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> uploadImage(RecipeImageUpload upload) async =>
       throw UnimplementedError();
 
   @override

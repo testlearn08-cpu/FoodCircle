@@ -51,6 +51,40 @@ $$;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 
+-- Minimal test-only stand-in for the Supabase Storage tables and helper used by migration 005.
+-- Supabase owns these objects in production; this stub exists only so the same policies can be
+-- exercised against the PostgreSQL service used by CI.
+create schema if not exists storage;
+
+create table if not exists storage.buckets (
+  id text primary key,
+  name text not null,
+  public boolean not null default false,
+  file_size_limit bigint,
+  allowed_mime_types text[]
+);
+
+create table if not exists storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text not null references storage.buckets(id) on delete cascade,
+  name text not null,
+  unique (bucket_id, name)
+);
+
+create or replace function storage.foldername(object_name text)
+returns text[]
+language sql
+immutable
+as $$
+  select string_to_array(object_name, '/')
+$$;
+
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon, authenticated, service_role;
+grant execute on function storage.foldername(text) to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects to anon, authenticated, service_role;
+grant select on storage.buckets to anon, authenticated, service_role;
+
 -- The policies call auth.uid(), and policy expressions are evaluated as the querying role.
 grant usage on schema public to anon, authenticated, service_role;
 

@@ -104,3 +104,32 @@ begin
   raise notice 'ok  U5. the policies still work on the upgraded schema';
 end
 $$;
+
+do $$
+declare
+  is_public boolean;
+  policy_count int;
+begin
+  select public into is_public
+    from storage.buckets where id = 'recipe-images';
+  if not found or is_public is distinct from true then
+    raise exception 'the upgrade did not create a public recipe-images bucket';
+  end if;
+
+  select count(*) into policy_count
+    from pg_policies
+   where schemaname = 'storage'
+     and tablename = 'objects'
+     and policyname in (
+       'recipe_images_read_public',
+       'recipe_images_insert_own',
+       'recipe_images_update_own',
+       'recipe_images_delete_own'
+     );
+  if policy_count <> 4 then
+    raise exception 'the upgrade installed % of 4 recipe image policies', policy_count;
+  end if;
+
+  raise notice 'ok  U6. migration 005 creates the bucket and all four policies on upgrade';
+end
+$$;

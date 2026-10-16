@@ -3,24 +3,39 @@
 A responsive food-sharing community app — Flutter (Android / iOS / Web) on Supabase
 (PostgreSQL + Auth + Storage).
 
-## Status: early skeleton, actively being bootstrapped
+## Current status
 
-Be clear about what this is today, because it is easy to misread the repo:
+The repository contains the Phase 1a data/feed foundation plus an inferred Phase 1b/1c auth and
+recipe-image-storage implementation. The latter is being reconstructed from the repository's
+inferred roadmap because the authoritative handoff is not in this checkout; the new code is **not
+verified until its CI run passes**.
 
-- ✅ **Builds on every platform target, and its test suite passes** — in CI
-  ([run 38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443), all
-  seven jobs): `flutter build web --release` publishes a runnable web bundle, `flutter build apk
-  --debug` produces an installable Android APK, and 75 tests + `analyze` + `dart format` are green.
+- ✅ **Builds on every platform target, and its test suite passes** — in CI, all seven jobs:
+  `flutter build web --release` publishes a runnable web bundle, `flutter build apk --debug`
+  produces an installable Android APK, and the Dart suite (`analyze`, the tests, `dart format`) is
+  green. The two halves this branch merges were verified by
+  [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443) (75 tests)
+  and `38560095418` (58); the merged tree reports its own counts below.
 - ✅ Responsive navigation shell works: three top-level destinations (`/feed`, `/recipes`,
   `/profile`) with a desktop rail, tablet rail and mobile bottom bar, each with its own
   navigation stack.
-- ✅ Database schema + RLS policies are written (3 migrations).
+- ✅ Database schema + RLS policies are written (6 migrations).
+- ✅ **Auth is real, and it gates the account's own screens.** Email/password sign-in and sign-up
+  (`/sign-in`, `/sign-up`), session-aware routing with a return target, and sign-out on the
+  profile page. `/feed` stays public: signed out, the app is a read-only browser of public
+  recipes. `/recipes` and `/profile` require a session and send you to sign-in if you ask for
+  them without one. The Supabase SDK persists configured sessions; without a project the fake is
+  ephemeral and accepts demo credentials only.
+- ✅ **Recipes can carry an image.** `005_storage.sql` adds a public `recipe-images` bucket with
+  owner-folder write policies, and `RecipeRepository.uploadImage` returns the public URL. Its
+  visibility, 10 MiB limit and MIME allowlist are inferred defaults, not approved product
+  requirements, and the migration has never been deployed.
 - ⚠️ **iOS scaffolding exists but has never been compiled** — that needs macOS, which CI
   does not have.
 - ✅ **The feed is real.** `/feed` reads through a repository (Supabase, or in-memory when no
   project is configured) with pull-to-refresh and loading / empty / error states. Riverpod does
   the wiring; `supabase_flutter` is connected and initialised when a project is configured.
-- ⚠️ **The database is verified, not deployed.** Migrations `001`–`004` are applied from empty
+- ⚠️ **The database is verified, not deployed.** Migrations `001`–`006` are applied from empty
   *and* as an upgrade of a populated database on every CI run, and the RLS policies are
   exercised as `anon` / `authenticated` / `service_role`. No Supabase project exists yet.
 - ✅ **All three destinations are real.** `/feed` lists public recipes, `/recipes` is your own
@@ -31,12 +46,14 @@ Be clear about what this is today, because it is easy to misread the repo:
   ingredients, with tag chips built from the tags actually present. That filtering runs in the
   database (`006_recipe_search.sql`), because a substring of one element of a `text[]` is not
   something a PostgREST filter can express.
-- ❌ **Auth is not built.** There is no sign-in, so the writing screens run as the demo user when
-  no project is configured and say "Not signed in" when one is. There is no route guard yet.
+- ❌ **The rest of the product is still unbuilt.** Location, notifications and offline behaviour
+  have no implementation and no schema, and the approved handoff documents are missing. Phase 2
+  should not begin until the handoff and product sign-off arrive.
 
-**Read [`docs/ANALYSIS_AND_ROADMAP.md`](docs/ANALYSIS_AND_ROADMAP.md) first** — it is the current
-source of truth for state and for what happens next. `DEVELOPMENT_STATUS.md` is a historical log
-of earlier passes; `ARCHITECTURE.md` describes the shared foundation in detail.
+The source of the inferred plan is [`docs/ANALYSIS_AND_ROADMAP.md`](docs/ANALYSIS_AND_ROADMAP.md).
+The authoritative product handoff belongs under [`docs/handoff/`](docs/handoff/); see its README
+and [`RECONCILIATION.md`](docs/handoff/RECONCILIATION.md) for the open assumptions. `DEVELOPMENT_STATUS.md`
+is a historical log, not current state.
 
 ## Quick start
 
@@ -48,29 +65,32 @@ flutter analyze
 flutter test
 ```
 
-With no `--dart-define` the app runs on in-memory demo data — the feed works, and an amber banner
-says so. Point it at a project to use the real thing:
+With no `--dart-define`, the app runs on in-memory demo data. Sign-in and sign-up are simulated,
+credentials are not stored, and the feed displays a demo-mode banner. This is **not real
+authentication**. To connect an existing Supabase project, configure only its publishable/anon key:
 
 ```bash
 flutter run \
   --dart-define=SUPABASE_URL=https://<project>.supabase.co \
-  --dart-define=SUPABASE_PUBLISHABLE_KEY=<publishable / "anon" key>
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=<publishable / anon key>
 ```
 
-> The project runs today with **no configuration** — it has no Supabase connection yet. When auth
-> lands, the connection is supplied at build time rather than committed:
->
-> ```bash
-> flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
-> ```
->
-> Only the **anon** key ever belongs on a client. Never commit `service_role`.
+The Supabase Flutter SDK persists the configured auth session. **Only the publishable/anon key may
+reach a client; never use or commit `service_role`.** No project is configured in CI or in this
+sandbox.
 
-### Database
+### Database and storage
 
-Migrations live in `supabase/migrations/` and are applied in filename order; see
-[`supabase/README.md`](supabase/README.md) for the privacy model and the test suite. They have
-never been applied to a Supabase project — the first time they reach one they become append-only.
+Migrations live in `supabase/migrations/` and run in filename order. They have never been applied to
+a Supabase project; once deployed, applied migrations become append-only. The PostgreSQL CI suite
+uses test-only stubs for Supabase-managed `auth` and `storage` objects and exercises recipe-image
+read/write policies without creating a Supabase project.
+
+`RecipeRepository.uploadImage` is a repository-only, provisional upload path: it accepts JPEG, PNG,
+or WebP bytes up to 10 MiB, uses the current authenticated user's folder in the public
+`recipe-images` bucket, and returns the public URL. These limits and bucket rules are inferred and
+must be reconciled with the authoritative handoff before deployment. The in-memory demo refuses
+binary uploads; no recipe-editor UI is wired to the API yet.
 
 ```bash
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests/run.sh
@@ -78,14 +98,16 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request:
+`.github/workflows/ci.yml` runs on pushes to `main` and `arena/**`, pull requests, and manual
+dispatch:
 
 | Job | What it proves |
 |---|---|
 | `No credentials committed` | No `service_role` key, personal access token or private key is in the repository. It is public, and a leaked `service_role` key bypasses every RLS policy. |
+| `Dart static guardrails` | Public-feed/auth-route boundaries, auth-state refresh, and publishable-key wiring remain present. |
 | `SQL expectations` | The RLS policies and the `auth.users` leak guard still exist as written (python3, ~5s). |
-| `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 28 checks as `anon` / `authenticated` / `service_role`, including the ones that prove a search cannot see past the visibility rule. |
-| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean, 75 tests pass. |
+| `Database behaviour (RLS)` | The migrations apply to a real `postgres:17` and the policies behave: 32 checks as `anon` / `authenticated` / `service_role`, covering the recipe and profile policies, the public image bucket's owner-folder writes, and the checks that prove a search cannot see past the visibility rule. |
+| `Flutter analyze + test` | Compiles, `flutter_lints` clean, `dart format` clean, and the whole Dart suite passes. |
 | `Scaffolding report` | Diffs the repo against what `flutter create` generates, and publishes a pristine reference app to `ci-scaffold`. |
 | `Build web + publish preview` | `flutter build web --release` succeeds, and a run that is not a pull request force-pushes the bundle to the `preview` branch. PR runs build it without publishing, so a broken web build still fails the PR. |
 | `Build debug APK` | The Android target really builds; the APK is attached to the run. |
@@ -104,8 +126,9 @@ bundle), `ci-formatted` (the tree as `dart format` would write it). Each is forc
 run that owns it.
 
 ```bash
-git fetch origin ci-artifacts && git show origin/ci-artifacts:RUN.md   # what ran, what failed
-git show origin/ci-artifacts:analyze.log                              # and why
+git fetch origin ci-artifacts && git show origin/ci-artifacts:RUN.md
+git show origin/ci-artifacts:analyze.log
+git show origin/ci-artifacts:dart-static.log
 ```
 
 ## Repository layout
@@ -113,24 +136,20 @@ git show origin/ci-artifacts:analyze.log                              # and why
 ```
 lib/
   main.dart                       entry point
-  app.dart                        MaterialApp.router + GoRouter, one branch per destination
+  app.dart                        MaterialApp.router + GoRouter: auth routes, the guard, one branch per destination
   navigation/responsive_shell.dart  rail / bottom bar from one destination list
-lib/core/                         config (--dart-define), Riverpod providers, session seam
+lib/core/config/                  --dart-define and Env.isConfigured
+lib/core/router/                  auth paths, return-target validation, router refresh
+lib/core/providers.dart           auth + identity, the repository, the feed and its filters
 lib/core/widgets/                 shared list, state and avatar widgets
 lib/data/                         models + repositories (Supabase and in-memory)
+lib/features/auth/                sign-in and sign-up
 lib/features/feed/                the public feed
 lib/features/recipes/             recipe page, recipe box, editor
-lib/features/profile/             the profile screen
-supabase/migrations/              001 schema · 002 indexes+triggers · 003 auth helpers · 004 metadata · 006 search
-supabase/tests/                   behavioural RLS suite, migration-upgrade test, auth stub
-test/                             navigation, policies, models, repositories, feed, detail, editor, profile
-tool/check_sql_expectations.py    fast local mirror of the policy assertions
+lib/features/profile/             identity, your recipe box, sign out
+supabase/migrations/              001 schema · 002 indexes+triggers · 003 auth helpers · 004 metadata · 005 storage · 006 search
+supabase/tests/                   behavioural RLS suite, migration-upgrade test, auth/storage stubs
+test/                             navigation, policies, models, repositories, feed, detail, editor, profile, auth, search
+tool/                             static guards (secrets, Dart surface, SQL expectations) and the local SQL suite
 docs/ANALYSIS_AND_ROADMAP.md      current state + delivery plan
 ```
-
-## Development environment note
-
-This repository is currently developed from a sandbox that has **no Flutter SDK and no network
-access to the SDK download hosts or to Actions job logs**. Dart code is therefore written blind and
-verified by CI, which is why CI is wired to publish its own logs, its build output and a runnable
-web preview. See Phase 0 in the roadmap.

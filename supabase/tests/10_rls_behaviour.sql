@@ -31,6 +31,10 @@ insert into public.recipes (id, author_id, title, is_public) values
   ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
    'Bob''s private pie', false);
 
+insert into storage.objects (bucket_id, name) values
+  ('recipe-images', '11111111-1111-1111-1111-111111111111/alice.webp'),
+  ('recipe-images', '22222222-2222-2222-2222-222222222222/bob.webp');
+
 -- ---------------------------------------------------------------------------------------------
 -- 1-8: schema-level guarantees
 -- ---------------------------------------------------------------------------------------------
@@ -504,7 +508,137 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------------------------
--- 22-27: search (migration 006)
+-- 22-25: public recipe images, with owner-scoped writes in Storage
+-- ---------------------------------------------------------------------------------------------
+
+do $$
+declare
+  is_public boolean;
+  file_limit bigint;
+  mime_types text[];
+begin
+  perform set_config('role', 'none', true);
+  select public, file_size_limit, allowed_mime_types
+    into is_public, file_limit, mime_types
+    from storage.buckets where id = 'recipe-images';
+
+  if not found or is_public is distinct from true then
+    raise exception 'recipe-images must exist as a public bucket';
+  end if;
+  if file_limit <> 10485760 then
+    raise exception 'recipe-images should have the inferred 10 MiB limit, got %', file_limit;
+  end if;
+  if mime_types <> array['image/jpeg', 'image/png', 'image/webp'] then
+    raise exception 'recipe-images should accept only the supported image MIME types, got %',
+      mime_types;
+  end if;
+  raise notice 'ok 22. the recipe-images bucket is public and restricted to supported image uploads';
+end
+$$;
+
+do $$
+declare
+  n int;
+begin
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '', true);
+
+  select count(*) into n from storage.objects where bucket_id = 'recipe-images';
+  if n <> 2 then
+    raise exception 'anon should read the 2 public recipe images, saw %', n;
+  end if;
+  raise notice 'ok 23. public clients can read images from the public recipe bucket';
+end
+$$;
+
+do $$
+declare
+  n int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    '{"sub": "11111111-1111-1111-1111-111111111111"}', true);
+
+  insert into storage.objects (bucket_id, name)
+  values ('recipe-images', '11111111-1111-1111-1111-111111111111/upload.webp');
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'an owner could not insert an image into their folder';
+  end if;
+
+  perform set_config('role', 'anon', true);
+  perform set_config('request.jwt.claims', '', true);
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('recipe-images', 'anonymous/unauthenticated.webp');
+    raise exception 'an anonymous client inserted a recipe image';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    '{"sub": "11111111-1111-1111-1111-111111111111"}', true);
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('recipe-images', '22222222-2222-2222-2222-222222222222/stolen.webp');
+    raise exception 'a user inserted an image into another user''s folder';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  update storage.objects
+     set name = '11111111-1111-1111-1111-111111111111/renamed.webp'
+   where bucket_id = 'recipe-images'
+     and name = '11111111-1111-1111-1111-111111111111/upload.webp';
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'an owner could not update an image in their folder';
+  end if;
+
+  begin
+    update storage.objects
+       set name = '22222222-2222-2222-2222-222222222222/moved.webp'
+     where bucket_id = 'recipe-images'
+       and name = '11111111-1111-1111-1111-111111111111/renamed.webp';
+    raise exception 'a user moved an image into another user''s folder';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  raise notice 'ok 24. authenticated users can write only within their own image folder';
+end
+$$;
+
+do $$
+declare
+  n int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    '{"sub": "11111111-1111-1111-1111-111111111111"}', true);
+
+  delete from storage.objects
+   where bucket_id = 'recipe-images'
+     and name = '22222222-2222-2222-2222-222222222222/bob.webp';
+  get diagnostics n = row_count;
+  if n <> 0 then
+    raise exception 'a user deleted % image(s) from another user''s folder', n;
+  end if;
+
+  delete from storage.objects
+   where bucket_id = 'recipe-images'
+     and name = '11111111-1111-1111-1111-111111111111/renamed.webp';
+  get diagnostics n = row_count;
+  if n <> 1 then
+    raise exception 'an owner deleted % images from their own folder, expected 1', n;
+  end if;
+  raise notice 'ok 25. authenticated users can delete only images in their own folder';
+end
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- 26-32: search (migration 006)
 --
 -- These need recipes with ingredients and tags, which the fixtures above deliberately do not
 -- have. They insert their own and delete them again at the end, so the table is left exactly as
@@ -549,7 +683,7 @@ begin
   if n <> 1 then
     raise exception 'ingredient search returned % rows, expected the one with "1 cup red lentils"', n;
   end if;
-  raise notice 'ok 22. anon can search ingredients, and only sees public matches';
+  raise notice 'ok 26. anon can search ingredients, and only sees public matches';
 
   -- 23. an author finds their own private recipe; someone else does not.
   perform set_config('role', 'authenticated', true);
@@ -566,7 +700,7 @@ begin
   if n <> 0 then
     raise exception 'search showed someone else''s private recipe (% rows)', n;
   end if;
-  raise notice 'ok 23. search respects the visibility rule for signed-in users too';
+  raise notice 'ok 27. search respects the visibility rule for signed-in users too';
 
   -- 24. matching is case-insensitive, on the title and on an ingredient.
   perform set_config('role', 'anon', true);
@@ -581,7 +715,7 @@ begin
   if n <> 1 then
     raise exception 'ingredient search should be case-insensitive, matched %', n;
   end if;
-  raise notice 'ok 24. search is case-insensitive over titles and ingredients';
+  raise notice 'ok 28. search is case-insensitive over titles and ingredients';
 
   -- 25. the tag filter narrows, and combines with the text query.
   select count(*) into n from public.search_recipes(tag => 'weeknight');
@@ -598,7 +732,7 @@ begin
   if n <> 0 then
     raise exception 'an unknown tag matched % rows', n;
   end if;
-  raise notice 'ok 25. the tag filter narrows a search and combines with the text query';
+  raise notice 'ok 29. the tag filter narrows a search and combines with the text query';
 
   -- 26. `%` and `_` are literals in a query, not wildcards.
   --
@@ -627,7 +761,7 @@ begin
   if n <> 0 then
     raise exception 'a query of one underscore matched % rows, expected none', n;
   end if;
-  raise notice 'ok 26. percent and underscore in a query are literals, not wildcards';
+  raise notice 'ok 30. percent and underscore in a query are literals, not wildcards';
 
   -- 27. pagination and the row cap follow the same contract as the feed.
   perform set_config('role', 'anon', true);
@@ -668,7 +802,7 @@ begin
   if n <> 1 then
     raise exception 'before excluded rows it should have kept (% rows)', n;
   end if;
-  raise notice 'ok 27. max_rows is clamped and before paginates, as the feed contract says';
+  raise notice 'ok 31. max_rows is clamped and before paginates, as the feed contract says';
 
   -- Leave the table as it was found. check 14 above counts every recipe, and a future check
   -- should not have to know that these four rows existed.
@@ -713,6 +847,6 @@ begin
   if n <> 0 then
     raise exception 'public gained % view(s)', n;
   end if;
-  raise notice 'ok 28. search_recipes is SECURITY INVOKER with a pinned search_path';
+  raise notice 'ok 32. search_recipes is SECURITY INVOKER with a pinned search_path';
 end
 $$;

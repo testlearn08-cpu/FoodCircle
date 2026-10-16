@@ -5,16 +5,15 @@
 // pin the parts that are easier to reason about away from the widget tree.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:foodcircle/app.dart';
-import 'package:foodcircle/core/providers.dart';
 import 'package:foodcircle/data/models/recipe.dart';
 import 'package:foodcircle/data/repositories/in_memory_recipe_repository.dart';
 import 'package:foodcircle/data/repositories/recipe_repository.dart';
 import 'package:foodcircle/features/recipes/recipe_detail_screen.dart';
 import 'package:foodcircle/features/recipes/recipe_editor_screen.dart';
 import 'package:foodcircle/features/recipes/my_recipes_screen.dart';
+
+import 'support/demo_app.dart';
 
 /// Tall enough to lay the whole form out, so tapping Save never depends on a scroll position.
 const Size kTallPhone = Size(430, 2400);
@@ -23,22 +22,10 @@ Future<void> pumpEditor(
   WidgetTester tester,
   RecipeRepository repository,
 ) async {
-  tester.view.physicalSize = kTallPhone;
-  tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
+  await pumpFoodCircleApp(tester, repository: repository, size: kTallPhone);
 
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: <Override>[
-        recipeRepositoryProvider.overrideWithValue(repository),
-      ],
-      child: const FoodCircleApp(),
-    ),
-  );
-  await tester.pumpAndSettle();
-
-  // Feed -> recipe box -> editor, by tapping.
+  // Feed -> recipe box -> editor, by tapping. The recipe box is the account's own destination,
+  // so this also proves the router's guard lets a session through.
   await tester.tap(find.descendant(
     of: find.byType(BottomNavigationBar),
     matching: find.text('Recipes'),

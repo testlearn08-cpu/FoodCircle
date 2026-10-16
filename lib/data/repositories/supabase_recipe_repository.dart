@@ -1,20 +1,26 @@
+import 'dart:math';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/profile.dart';
 import '../models/recipe.dart';
+import '../models/recipe_image_upload.dart';
 import 'recipe_repository.dart';
 
-/// The real thing: PostgREST over the anon key, with RLS doing all the authorisation.
+/// The real thing: PostgREST and Storage over the publishable/anon key, with RLS doing all the
+/// authorization.
 ///
-/// Nothing here checks permissions. That is deliberate — the policies in `supabase/migrations`
-/// are the only authorization boundary, and a client that also checks is a client that lies to
-/// itself about being secure.
+/// The current auth user is used only to construct the Storage object's owner-folder path; that
+/// client-side value grants no permission. The policies in `supabase/migrations` remain the only
+/// authorization boundary.
 class SupabaseRecipeRepository implements RecipeRepository {
   SupabaseRecipeRepository(this._client);
 
   final SupabaseClient _client;
 
   static const String _table = 'recipes';
+  static const String _imageBucket = 'recipe-images';
+  static final Random _secureRandom = Random.secure();
 
   @override
   Future<List<Recipe>> fetchFeed({
@@ -89,6 +95,25 @@ class SupabaseRecipeRepository implements RecipeRepository {
   }
 
   @override
+  Future<String> uploadImage(RecipeImageUpload upload) async {
+    final String? userId = _client.auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) {
+      throw StateError('Sign in is required to upload a recipe image.');
+    }
+
+    // The authenticated session supplies the first path segment checked by migration 005. Do not
+    // accept a caller-provided owner ID or filename; both could escape the user's Storage folder.
+    final String path = '$userId/${_newImageName(upload.extension)}';
+    final bucket = _client.storage.from(_imageBucket);
+    await bucket.uploadBinary(
+      path,
+      upload.bytes,
+      fileOptions: FileOptions(contentType: upload.contentType, upsert: false),
+    );
+    return bucket.getPublicUrl(path);
+  }
+
+  @override
   Future<Recipe> create(RecipeDraft draft) async {
     final row = await _client
         .from(_table)
@@ -115,6 +140,14 @@ class SupabaseRecipeRepository implements RecipeRepository {
   @override
   Future<void> delete(String id) async {
     await _client.from(_table).delete().eq('id', id);
+  }
+
+  static String _newImageName(String extension) {
+    final String randomPart = List<int>.generate(
+      16,
+      (_) => _secureRandom.nextInt(256),
+    ).map((int byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    return '$randomPart.$extension';
   }
 
   Future<List<Recipe>> _withAuthors(List<Map<String, dynamic>> rows) async {
