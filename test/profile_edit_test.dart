@@ -80,9 +80,15 @@ void main() {
     testWidgets('opens with what the profile already says', (tester) async {
       await openEditor(tester);
 
-      expect(inEditor('Ana'), findsOneWidget);
-      expect(inEditor('ana_cooks'), findsOneWidget);
-      expect(inEditor('Cooks for four, most days.'), findsOneWidget);
+      // Read through the controllers rather than by matching text: an empty field renders its
+      // hint, and these hints are the values a demo profile happens to have, so `find.text`
+      // matches twice. The controller is also the thing that gets saved.
+      expect(fieldText(tester, 'profile-edit-display-name'), 'Ana');
+      expect(fieldText(tester, 'profile-edit-username'), 'ana_cooks');
+      expect(
+        fieldText(tester, 'profile-edit-bio'),
+        'Cooks for four, most days.',
+      );
     });
 
     testWidgets('saving takes you back to the profile it changed', (
