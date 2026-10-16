@@ -12,10 +12,17 @@ new numbered file.
 - `001_initial_schema.sql` — Profiles, Recipes, RLS policies for both tables.
 - `002_indexes_and_triggers.sql` — Indexes, `updated_at` triggers.
 - `003_auth_helpers.sql` — Signup trigger that provisions profile rows.
-- `004_recipe_metadata.sql` — Recipe images URL and structured metadata; converts ingredient and step lists.
-- `005_storage.sql` — Inferred public `recipe-images` bucket; reads are public and writes are confined to the authenticated user's UUID folder. The current 10 MiB limit and JPEG/PNG/WebP allowlist are provisional and must be checked against the missing handoff before deployment.
+- `004_recipe_metadata.sql` — Image URL, servings, times, difficulty, tags; `jsonb` → `text[]` for
+  ingredients and steps.
+- `005_storage.sql` — Inferred public `recipe-images` bucket; reads are public and writes are
+  confined to the authenticated user's UUID folder. The 10 MiB limit and the JPEG/PNG/WebP
+  allowlist are provisional and must be checked against the missing handoff before deployment.
+- `006_recipe_search.sql` — `search_recipes()`, a `security invoker` function, so the feed can
+  search title and ingredient text.
 
-Migration `005` is still rewritable: no Supabase project exists, and the CI-only PostgreSQL test stub is not a deployment target. It deliberately adds no location, notification, or offline schema; those product requirements remain unresolved.
+`005` and `006` are both still rewritable: no Supabase project exists, and the CI-only PostgreSQL
+test stub is not a deployment target. Neither deliberately adds location, notification, or offline
+schema; those product requirements remain unresolved.
 
 Each `CREATE POLICY` is preceded by `DROP POLICY IF EXISTS`, so a partially applied migration
 can be re-run.
@@ -33,7 +40,7 @@ Two layers, deliberately:
 | Static | `test/privacy_test.dart` (+ `tool/check_sql_expectations.py`) | The policy text still says what it should. Fast, runs locally, catches an edit that weakens a policy in review. |
 | Behavioural | `supabase/tests/10_rls_behaviour.sql` | What the policies *do* when `anon`, `authenticated` and `service_role` run the queries: public/private recipe reads, owner-only writes, signup provisioning, account cascades, and public recipe-image reads with owner-folder writes. |
 
-The behavioural layer needs a PostgreSQL. To run it locally:
+The behavioural layer needs a PostgreSQL. With one available:
 
 ```bash
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests/run.sh
@@ -42,6 +49,24 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres supabase/tests
 That applies, in order: the auth stub, every migration, then the suite. Each failing
 expectation raises, so `psql -v ON_ERROR_STOP=1` makes it a pass/fail suite; each pass emits a
 `NOTICE`, so the log shows what was verified.
+
+**Without** one — which is the normal case for the sandbox this repository is developed from —
+the same suite runs on PGlite, PostgreSQL compiled to WebAssembly:
+
+```bash
+mkdir -p /tmp/pglite && cd /tmp/pglite && npm init -y && npm install @electric-sql/pglite
+cd -   # back to the repository root
+PGLITE_DIR=/tmp/pglite/node_modules node tool/run_sql_suite.mjs   # --statements for psql-like behaviour
+```
+
+`PGLITE_DIR` keeps the install out of the repository: the script resolves the module from there,
+and falls back to an ordinary `node_modules` lookup when the variable is unset.
+
+Same migrations, same suite, same checks, in seconds. It is a development aid and is not wired
+into CI, because CI has a real `postgres:17` service container and that is strictly better. Its
+value is running the SQL *before* pushing: it caught two real mistakes in `006`'s first version,
+including a `%` written straight into a `RAISE` notice — where it is a format placeholder, so
+the check had been passing without testing what its comment claimed.
 
 ### `supabase/tests/00_auth_stub.sql` is test infrastructure
 

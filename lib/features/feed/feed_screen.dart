@@ -1,246 +1,189 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/config/env.dart';
 import '../../core/providers.dart';
+import '../../core/widgets/recipe_list.dart';
+import '../../core/widgets/state_views.dart';
 import '../../data/models/recipe.dart';
 
-/// The public feed.
+/// The public feed, with search and a tag filter on top of it (S2 and S5 of the product spec).
 ///
-/// Reads [feedProvider] and nothing else, so it works identically against Supabase and against
-/// the in-memory repository — which is what the web preview and the widget tests use.
+/// Reads [feedProvider] and [feedTagsProvider] and nothing else, so it works identically against
+/// Supabase and against the in-memory repository — which is what the web preview and the widget
+/// tests use.
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Recipe>> feed = ref.watch(feedProvider);
+    final FeedQuery query = ref.watch(feedQueryProvider);
+    final AsyncValue<List<String>> tags = ref.watch(feedTagsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('FoodCircle'),
-        bottom: Env.isConfigured ? null : const _DemoModeBanner(),
+        bottom: demoBannerOrNull(),
       ),
-      body: RefreshIndicator(
-        // `ref.refresh(feedProvider.future)` returns the new value when it arrives, which is
-        // exactly what RefreshIndicator waits for.
-        onRefresh: () => ref.refresh(feedProvider.future),
-        child: feed.when(
-          data: (recipes) => recipes.isEmpty
-              ? const _CenteredMessage(
-                  icon: Icons.ramen_dining_outlined,
-                  title: 'Nothing here yet',
-                  message: 'Recipes shared publicly will show up here.',
-                )
-              : _RecipeList(recipes: recipes),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stackTrace) => _CenteredMessage(
-            icon: Icons.cloud_off_outlined,
-            title: 'Could not load the feed',
-            message: '$error',
-            action: FilledButton.tonal(
-              onPressed: () => ref.invalidate(feedProvider),
-              child: const Text('Try again'),
+      body: Column(
+        children: <Widget>[
+          _SearchField(text: query.text),
+          if (tags.valueOrNull?.isNotEmpty ?? false)
+            _TagFilter(tags: tags.value!, selected: query.tag),
+          Expanded(
+            child: RecipeAsyncList(
+              recipes: feed,
+              // Tapping used to explain that the detail screen was not built. It is built now,
+              // and it lives in this branch, so the shell stays put: `/feed/:id`.
+              onTap: (recipe) => context.push('/feed/${recipe.id}'),
+              onRefresh: () {
+                ref.invalidate(feedTagsProvider);
+                return ref.refresh(feedProvider.future);
+              },
+              onRetry: () => ref.invalidate(feedProvider),
+              emptyIcon: query.isFiltered
+                  ? Icons.search_off_outlined
+                  : Icons.ramen_dining_outlined,
+              emptyTitle:
+                  query.isFiltered ? 'No recipes match' : 'Nothing here yet',
+              emptyMessage: query.isFiltered
+                  ? 'Nothing in the feed matches that. Try fewer words, or '
+                      'a different tag.'
+                  : 'Recipes shared publicly will show up here.',
+              // An empty search result is a dead end unless there is a way back out of it.
+              emptyAction: query.isFiltered
+                  ? FilledButton.tonal(
+                      onPressed: () {
+                        ref.read(feedQueryProvider.notifier).state =
+                            const FeedQuery();
+                      },
+                      child: const Text('Clear search'),
+                    )
+                  : null,
+              errorTitle: 'Could not load the feed',
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-class _RecipeList extends StatelessWidget {
-  const _RecipeList({required this.recipes});
+/// The search box. Owns nothing but its debounce timer: the query itself lives in
+/// [feedQueryProvider], so the clear button, the empty state's "Clear search" and the field all
+/// write to the same place instead of each keeping a copy.
+class _SearchField extends ConsumerStatefulWidget {
+  const _SearchField({required this.text});
 
-  final List<Recipe> recipes;
+  final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: recipes.length,
-      separatorBuilder: (context, index) => const Divider(height: 1),
-      itemBuilder: (context, index) => _RecipeTile(recipe: recipes[index]),
-    );
-  }
+  ConsumerState<_SearchField> createState() => _SearchFieldState();
 }
 
-class _RecipeTile extends StatelessWidget {
-  const _RecipeTile({required this.recipe});
+class _SearchFieldState extends ConsumerState<_SearchField> {
+  /// Typing should not mean one request per keystroke, but it should also not feel laggy: 300ms
+  /// is about the point where a fast typist has stopped mid-word. Pressing enter skips the wait.
+  static const Duration _debounceDelay = Duration(milliseconds: 300);
 
-  final Recipe recipe;
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.text);
+  Timer? _debounce;
+
+  @override
+  void didUpdateWidget(covariant _SearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Something else cleared the query (the empty state's button, or a future "reset filters"):
+    // the field has to follow, or it would show a search that is no longer applied.
+    if (widget.text != _controller.text) {
+      _controller.text = widget.text;
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _apply(String value) {
+    _debounce?.cancel();
+    final FeedQuery current = ref.read(feedQueryProvider);
+    ref.read(feedQueryProvider.notifier).state = current.copyWith(text: value);
+  }
+
+  void _onChanged(String value) {
+    // Rebuilds for the clear button's visibility; the query itself waits for the debounce.
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDelay, () => _apply(value));
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final String? imageUrl = recipe.imageUrl;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: _Thumbnail(imageUrl: imageUrl),
-      title: Text(
-        recipe.title,
-        style: theme.textTheme.titleMedium,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(
-          _subtitleFor(recipe),
-          style: theme.textTheme.bodySmall,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      trailing:
-          recipe.isPublic ? null : const Icon(Icons.lock_outline, size: 18),
-      onTap: () {
-        // The detail screen is Phase 2; until then, say so rather than doing nothing.
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('${recipe.title} — detail screen is not built yet')),
-        );
-      },
-    );
-  }
-
-  static String _subtitleFor(Recipe recipe) {
-    final List<String> parts = <String>[
-      if (recipe.author != null) recipe.author!.name,
-      _relativeTime(recipe.createdAt),
-      if (recipe.difficulty != null) recipe.difficulty!,
-      if (recipe.totalMinutes != null) '${recipe.totalMinutes} min',
-    ];
-    return parts.join(' · ');
-  }
-
-  static String _relativeTime(DateTime when) {
-    final Duration age = DateTime.now().difference(when);
-    if (age.inMinutes < 1) return 'just now';
-    if (age.inHours < 1) return '${age.inMinutes} min ago';
-    if (age.inDays < 1) return '${age.inHours} h ago';
-    if (age.inDays < 30) return '${age.inDays} d ago';
-    final int months = age.inDays ~/ 30;
-    return months == 1 ? '1 month ago' : '$months months ago';
-  }
-}
-
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.imageUrl});
-
-  final String? imageUrl;
-
-  static const double _size = 56;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final String? url = imageUrl;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: _size,
-        height: _size,
-        child: url == null
-            ? ColoredBox(
-                color: scheme.surfaceContainerHighest,
-                child: Icon(Icons.restaurant_menu_outlined,
-                    color: scheme.onSurfaceVariant),
-              )
-            : Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => ColoredBox(
-                  color: scheme.surfaceContainerHighest,
-                  child: Icon(Icons.broken_image_outlined,
-                      color: scheme.onSurfaceVariant),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: TextField(
+        controller: _controller,
+        onChanged: _onChanged,
+        onSubmitted: _apply,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search title or ingredients',
+          prefixIcon: const Icon(Icons.search),
+          border: const OutlineInputBorder(),
+          isDense: true,
+          suffixIcon: _controller.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.clear),
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _controller.clear();
+                    _apply('');
+                  },
                 ),
-              ),
-      ),
-    );
-  }
-}
-
-class _CenteredMessage extends StatelessWidget {
-  const _CenteredMessage({
-    required this.icon,
-    required this.title,
-    required this.message,
-    this.action,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    // Scrollable even when the content fits, so RefreshIndicator keeps working on an empty or
-    // failed feed — otherwise the only way out of the error state is the retry button.
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(icon, size: 48, color: theme.colorScheme.outline),
-                  const SizedBox(height: 16),
-                  Text(title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  if (action != null) ...<Widget>[
-                    const SizedBox(height: 24),
-                    action!,
-                  ],
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );
   }
 }
 
-/// Says plainly that this build is not connected to anything, because a demo that looks real is
-/// worse than a demo that says it is a demo.
-class _DemoModeBanner extends StatelessWidget implements PreferredSizeWidget {
-  const _DemoModeBanner();
+/// The tag filter, built from the tags actually present in the feed.
+class _TagFilter extends ConsumerWidget {
+  const _TagFilter({required this.tags, required this.selected});
+
+  final List<String> tags;
+  final String? selected;
 
   @override
-  Size get preferredSize => const Size.fromHeight(26);
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        itemCount: tags.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final String tag = tags[index];
+          final bool isSelected = tag == selected;
 
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      height: 26,
-      width: double.infinity,
-      color: scheme.tertiaryContainer,
-      alignment: Alignment.center,
-      child: Text(
-        'Demo data · no Supabase project configured',
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: scheme.onTertiaryContainer),
+          return ChoiceChip(
+            label: Text('#$tag'),
+            selected: isSelected,
+            // Tapping the selected chip clears the filter, which is what the control implies.
+            onSelected: (bool nowSelected) {
+              ref.read(feedQueryProvider.notifier).state = ref
+                  .read(feedQueryProvider)
+                  .copyWith(tag: tag, clearTag: !nowSelected);
+            },
+          );
+        },
       ),
     );
   }

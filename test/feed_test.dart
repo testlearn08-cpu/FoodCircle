@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:foodcircle/app.dart';
 import 'package:foodcircle/core/config/env.dart';
 import 'package:foodcircle/core/providers.dart';
+import 'package:foodcircle/data/models/profile.dart';
 import 'package:foodcircle/data/models/recipe.dart';
 import 'package:foodcircle/data/models/recipe_image_upload.dart';
 import 'package:foodcircle/data/repositories/in_memory_recipe_repository.dart';
@@ -19,7 +20,12 @@ class _FailingRepository implements RecipeRepository {
   int calls = 0;
 
   @override
-  Future<List<Recipe>> fetchFeed({int limit = 20, DateTime? before}) async {
+  Future<List<Recipe>> fetchFeed({
+    int limit = 20,
+    DateTime? before,
+    String? query,
+    String? tag,
+  }) async {
     calls++;
     throw StateError('the network is on fire');
   }
@@ -32,7 +38,14 @@ class _FailingRepository implements RecipeRepository {
       throw UnimplementedError();
 
   @override
+  Future<Profile?> fetchProfile(String id) async => throw UnimplementedError();
+
+  @override
   Future<Recipe> create(RecipeDraft draft) async => throw UnimplementedError();
+
+  @override
+  Future<Recipe> update(String id, RecipeDraft draft) async =>
+      throw UnimplementedError();
 
   @override
   Future<String> uploadImage(RecipeImageUpload upload) async =>
@@ -94,12 +107,16 @@ void main() {
 
     expect(find.text('Could not load the feed'), findsOneWidget);
     expect(find.textContaining('the network is on fire'), findsOneWidget);
-    expect(repository.calls, 1);
+    // Not an exact count any more: the tag chips are derived from the feed and read the same
+    // repository, so they fail alongside it. What matters is that the feed was asked at all, and
+    // that asking again is what the retry does.
+    final int before = repository.calls;
+    expect(before, greaterThan(0));
 
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
 
-    expect(repository.calls, 2,
+    expect(repository.calls, greaterThan(before),
         reason: 'retry must re-run the provider, not just rebuild');
   });
 }

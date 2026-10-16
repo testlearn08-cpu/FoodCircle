@@ -23,13 +23,43 @@ class SupabaseRecipeRepository implements RecipeRepository {
   static final Random _secureRandom = Random.secure();
 
   @override
-  Future<List<Recipe>> fetchFeed({int limit = 20, DateTime? before}) async {
-    var query = _client.from(_table).select().eq('is_public', true);
-    if (before != null) {
-      query = query.lt('created_at', before.toUtc().toIso8601String());
+  Future<List<Recipe>> fetchFeed({
+    int limit = 20,
+    DateTime? before,
+    String? query,
+    String? tag,
+  }) async {
+    final String needle = (query ?? '').trim();
+
+    // Anything the filters can express sends the query to the database instead: matching a
+    // substring of one element of the ingredients array is not something a PostgREST filter can
+    // do, and the visibility rule has to stay in one place (the policies). See
+    // supabase/migrations/006_recipe_search.sql.
+    if (needle.isNotEmpty || tag != null) {
+      final dynamic result = await _client.rpc(
+        'search_recipes',
+        params: <String, dynamic>{
+          'q': needle.isEmpty ? null : needle,
+          'tag': tag,
+          'before': before?.toUtc().toIso8601String(),
+          'max_rows': limit,
+        },
+      );
+
+      final List<dynamic> rows = result is List ? result : const <dynamic>[];
+      return _withAuthors(<Map<String, dynamic>>[
+        for (final row in rows) Map<String, dynamic>.from(row as Map),
+      ]);
     }
 
-    final rows = await query.order('created_at', ascending: false).limit(limit);
+    var queryBuilder = _client.from(_table).select().eq('is_public', true);
+    if (before != null) {
+      queryBuilder =
+          queryBuilder.lt('created_at', before.toUtc().toIso8601String());
+    }
+
+    final rows =
+        await queryBuilder.order('created_at', ascending: false).limit(limit);
     return _withAuthors(rows);
   }
 
@@ -52,6 +82,16 @@ class SupabaseRecipeRepository implements RecipeRepository {
         .order('created_at', ascending: false)
         .limit(limit);
     return _withAuthors(rows);
+  }
+
+  @override
+  Future<Profile?> fetchProfile(String id) async {
+    final row = await _client
+        .from('profiles')
+        .select('id, username, display_name, avatar_url, bio')
+        .eq('id', id)
+        .maybeSingle();
+    return row == null ? null : Profile.fromJson(row);
   }
 
   @override
@@ -80,6 +120,20 @@ class SupabaseRecipeRepository implements RecipeRepository {
         .insert(draft.toInsertJson())
         .select()
         .single();
+    return Recipe.fromJson(row);
+  }
+
+  @override
+  Future<Recipe> update(String id, RecipeDraft draft) async {
+    final json = draft.toInsertJson()
+      // A recipe cannot change author, and the update policy rejects the attempt anyway.
+      ..remove('author_id')
+      // The editor has no image field yet (uploads need the storage policies in migration 005),
+      // so an edit must not silently drop an image the row already has.
+      ..remove('image_url');
+
+    final row =
+        await _client.from(_table).update(json).eq('id', id).select().single();
     return Recipe.fromJson(row);
   }
 

@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:foodcircle/app.dart';
 import 'package:foodcircle/core/providers.dart';
 import 'package:foodcircle/data/repositories/in_memory_auth_repository.dart';
-import 'package:foodcircle/features/auth/account_screen.dart';
+import 'package:foodcircle/features/profile/profile_screen.dart';
 import 'package:foodcircle/features/auth/sign_in_screen.dart';
 import 'package:foodcircle/features/auth/sign_up_screen.dart';
 import 'package:foodcircle/features/feed/feed_screen.dart';
@@ -85,7 +85,7 @@ void main() {
         await tester.tap(find.byKey(const Key('sign-up-submit')));
         await tester.pumpAndSettle();
 
-        expect(find.byType(AccountScreen), findsOneWidget);
+        expect(find.byType(ProfileScreen), findsOneWidget);
         expect(find.text('cook@example.com'), findsOneWidget);
 
         await tester.tap(find.byKey(const Key('account-sign-out')));
@@ -112,7 +112,7 @@ void main() {
       await tester.tap(find.byKey(const Key('sign-in-submit')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AccountScreen), findsOneWidget);
+      expect(find.byType(ProfileScreen), findsOneWidget);
       expect(find.text('cook@example.com'), findsOneWidget);
     });
   });

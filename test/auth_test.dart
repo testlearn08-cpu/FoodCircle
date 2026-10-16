@@ -26,10 +26,10 @@ import 'package:foodcircle/app.dart';
 import 'package:foodcircle/core/providers.dart';
 import 'package:foodcircle/data/models/auth_user.dart';
 import 'package:foodcircle/data/repositories/in_memory_auth_repository.dart';
-import 'package:foodcircle/features/auth/account_screen.dart';
 import 'package:foodcircle/features/feed/feed_screen.dart';
+import 'package:foodcircle/features/profile/profile_screen.dart';
+import 'package:foodcircle/features/recipes/my_recipes_screen.dart';
 import 'package:foodcircle/navigation/responsive_shell.dart';
-import 'package:foodcircle/screens/placeholder_screen.dart';
 
 void main() {
   /// Pumps the app at a given logical size.
@@ -127,10 +127,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // The Recipes branch is now built and showing.
-        expect(
-          find.widgetWithText(PlaceholderScreen, 'Recipes'),
-          findsOneWidget,
-        );
+        expect(find.byType(MyRecipesScreen), findsOneWidget);
         // ...and the shell survived the navigation, with the rail following along.
         expect(find.byType(NavigationRail), findsOneWidget);
         expect(
@@ -167,7 +164,8 @@ void main() {
       await tester.tap(barLabel('Profile'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AccountScreen), findsOneWidget);
+      expect(find.byType(ProfileScreen), findsOneWidget);
+      // The account line the sign-in screen's tests relied on is part of this screen now.
       expect(find.text('test@example.com'), findsOneWidget);
       expect(
         tester

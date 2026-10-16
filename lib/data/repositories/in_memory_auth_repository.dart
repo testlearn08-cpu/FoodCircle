@@ -11,7 +11,14 @@ import 'auth_repository.dart';
 class InMemoryAuthRepository implements AuthRepository {
   InMemoryAuthRepository({AuthUser? initialUser}) : _currentUser = initialUser;
 
-  static const String _demoUserId = '00000000-0000-4000-8000-000000000001';
+  /// The identity every demo sign-in becomes.
+  ///
+  /// Deliberately the same id as the seeded demo author in [InMemoryRecipeRepository.seeded], so
+  /// that a demo build hangs together: signing in makes you the author of the recipes already in
+  /// the feed, which is what makes "create a recipe, then see it in your recipe box" demoable
+  /// without a Supabase project. It is not a UUID and does not need to be — nothing on this path
+  /// talks to Postgres, where the column is a real `uuid`.
+  static const String demoUserId = 'demo-ana';
 
   final StreamController<AuthUser?> _userChanges =
       StreamController<AuthUser?>.broadcast(sync: true);
@@ -31,7 +38,7 @@ class InMemoryAuthRepository implements AuthRepository {
       throw const AuthFailure('Enter an email address and password.');
     }
 
-    _setCurrentUser(AuthUser(id: _demoUserId, email: normalizedEmail));
+    _setCurrentUser(AuthUser(id: demoUserId, email: normalizedEmail));
   }
 
   @override
@@ -48,7 +55,7 @@ class InMemoryAuthRepository implements AuthRepository {
       throw const AuthFailure('Complete all fields to create an account.');
     }
 
-    _setCurrentUser(AuthUser(id: _demoUserId, email: normalizedEmail));
+    _setCurrentUser(AuthUser(id: demoUserId, email: normalizedEmail));
     return const AuthSignUpResult(requiresEmailConfirmation: false);
   }
 

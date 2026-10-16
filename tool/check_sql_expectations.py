@@ -20,6 +20,19 @@ MIGRATIONS = {
     "002_indexes_and_triggers.sql": "supabase/migrations/002_indexes_and_triggers.sql",
     "003_auth_helpers.sql": "supabase/migrations/003_auth_helpers.sql",
     "005_storage.sql": "supabase/migrations/005_storage.sql",
+    "006_recipe_search.sql": "supabase/migrations/006_recipe_search.sql",
+}
+
+# Which Dart variable in test/privacy_test.dart holds which migration, so that a *negative*
+# assertion can be checked against the file it is about. Without this, a negative has to be
+# globally absent, which rules out asserting anything useful about one file: "006 contains no
+# is_public" is true, while "no migration contains is_public" is false and always will be.
+MIGRATION_VARIABLES = {
+    "schema": "001_initial_schema.sql",
+    "indexesAndTriggers": "002_indexes_and_triggers.sql",
+    "authHelpers": "003_auth_helpers.sql",
+    "imageStorage": "005_storage.sql",
+    "searchMigration": "006_recipe_search.sql",
 }
 
 
@@ -75,7 +88,8 @@ def main() -> int:
     test_path = pathlib.Path("test/privacy_test.dart")
     src = strip_comments(test_path.read_text())
 
-    # Every contains(...) call, flagged as negative when wrapped in isNot(...).
+    # Every contains(...) call, flagged as negative when wrapped in isNot(...), and carrying the
+    # expect() target when it is one of the known migration variables.
     calls = []
     for m in re.finditer(r"contains\(", src):
         before = src[max(0, m.start() - 12):m.start()]
@@ -88,11 +102,21 @@ def main() -> int:
             elif src[i] == ")":
                 depth -= 1
             i += 1
-        calls.append((before.endswith("isNot("), src[m.end():i - 1]))
+        negative = before.endswith("isNot(")
+        # `expect(<variable>, [isNot(]contains(` — the nearest expect() before this call.
+        owner = None
+        if negative:
+            expect_at = src.rfind("expect(", 0, m.start())
+            if expect_at != -1:
+                target = re.match(r"expect\(\s*(\w+)", src[expect_at:])
+                if target:
+                    owner = MIGRATION_VARIABLES.get(target.group(1))
+        calls.append((negative, owner, src[m.end():i - 1]))
 
     checked = 0
+    scoped = 0
     failures = []
-    for negative, expr in calls:
+    for negative, owner, expr in calls:
         literals = dart_string_literals(expr)
         if not literals:
             continue
@@ -100,13 +124,19 @@ def main() -> int:
         if not fragment.strip():
             continue
 
-        hits = [name for name, body in sql.items() if fragment in body]
+        # A scoped negative only looks at the migration it is asserted about.
+        searched = {owner: sql[owner]} if (negative and owner) else sql
+        hits = [name for name, body in searched.items() if fragment in body]
 
         if negative:
             if hits:
-                failures.append(f"NEGATIVE assertion violated: {fragment!r} found in {hits}")
+                where = f" (scoped to {owner})" if owner else ""
+                failures.append(
+                    f"NEGATIVE assertion violated{where}: {fragment!r} found in {hits}")
             else:
                 checked += 1
+                if owner:
+                    scoped += 1
         else:
             if hits:
                 checked += 1
@@ -115,7 +145,8 @@ def main() -> int:
                 failures.append(f"EXPECTED fragment not found in ANY migration: {fragment!r}")
 
     print()
-    print(f"assertions checked: {checked}, failures: {len(failures)}")
+    print(f"assertions checked: {checked} ({scoped} scoped to one migration), "
+          f"failures: {len(failures)}")
     for f in failures:
         print(f"  {f}")
     return 1 if failures else 0

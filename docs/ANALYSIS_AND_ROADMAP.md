@@ -65,8 +65,136 @@ to.
 | P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
 | Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
 | Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
-| Phase 1b Auth (screens, session, route guard) | ✅ verified in CI; included in open PR #5 | Supabase adapter + ephemeral fake, `/sign-in`, `/sign-up`, auth-state redirect refresh, sign-out; no Supabase project for end-to-end verification |
-| Phase 1c Migration 005 storage bucket + policies | ✅ policies verified in CI; repository upload adapter added as a provisional follow-up | Inferred public `recipe-images` bucket and UUID-folder write policies; upload API follows only this provisional contract; not deployed and still rewritable |
+| Phase 2a Product surface: recipe page, recipe box, editor, profile | ✅ done | every destination is real and a recipe can be written from the app; green run [38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) |
+| Phase 2b Search: title + ingredient text, tag filter | ✅ done | migration 006 + 7 behavioural checks; 75 tests, green run [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443) |
+| Phase 1b Auth (screens, session, route guard) | ✅ done, merged | Supabase adapter + ephemeral fake, `/sign-in`, `/sign-up`, auth-state redirect refresh, sign-out. Verified by PR #5's green run `38560095418`; merged into `main` as `db33dd3`, then integrated here (§1c). |
+| Phase 1c Migration 005 storage bucket + policies | ✅ done, merged | inferred public `recipe-images` bucket, reads public and writes confined to the authenticated user's UUID folder, plus the repository upload adapter. Not deployed and still rewritable. |
+
+---
+
+## 1c. Update — 2026-10-16: the two branches are one app now
+
+**Integration, not a feature.** `main` moved while this branch was being built: PR #5 landed the
+auth screens, session-aware routing and the migration `005` storage policies, and was merged as
+`db33dd3`. This branch had the product surface (§1a) and search (§1b). Both halves were green on
+their own; neither was green with the other, and 15 files conflicted.
+
+The interesting part is that the halves were built from opposite ends. §1a wrote screens against a
+placeholder identity seam (`lib/core/session.dart`) on the promise that Phase 1b would replace its
+body without touching the screens. Phase 1b landed with its own identity provider and its own
+sign-out screen. Both promises held, which is what made the merge a set of decisions rather than a
+rewrite:
+
+| Decision | Why |
+|---|---|
+| One identity seam: `currentUserIdProvider` moves into `lib/core/providers.dart`, derived from `authUserProvider`; `lib/core/session.dart` is deleted | The screens never read anything but `currentUserIdProvider`, so the swap is an import change. Null keeps its old meaning — nobody in particular — which is now the signed-out browser the policies already allow. |
+| The account surface folds into the profile page; `features/auth/account_screen.dart` is deleted | "Profile" showing your name, with your email two taps away on a second screen, is a worse screen than one that shows both. The sign-out key and the email text are unchanged, so the auth tests still describe it. |
+| The account card is the profile page's footer — outside the scroll and outside the profile-row branch | Signing out must not depend on your `profiles` row having loaded, or a profile that failed to load is an account you cannot leave. It also makes the email assertion independent of demo fixtures. |
+| `/recipes` stays "the recipes you wrote", and the router guard now covers it | It is the account's own data, and the guard is the same one that protects `/profile`. The screens keep their signed-out branch for direct pumps, but the router no longer reaches it. |
+| The demo sign-in identity is the seeded demo author (`demo-ana`, `InMemoryAuthRepository.demoUserId`) | A demo that signs you in as a stranger who owns nothing cannot demo the app: signing in makes you the author of the recipes already in the feed. Demo-only — the Supabase path uses the real session's UUID. |
+| The search checks are renumbered 26–32, after storage's 22–25 | Both suites are kept in full. `supabase/tests/10_rls_behaviour.sql` now runs 32 checks, and `tool/check_sql_expectations.py` knows `005` and `006` as separate files. |
+| `responsive_framework` stays removed and its breakpoint list does not come back with `main`'s `app.dart` | §1a removed it for being unread and wrong at the top end. The merged `app.dart` is §1a's route table plus `main`'s `redirect` and refresh listenable. |
+
+Tests moved with the decisions: `test/profile_test.dart`'s signed-out cases now assert the
+*redirect* (`/profile` → sign-in, `/recipes` → sign-in) instead of a "Not signed in" screen, and the
+screen tests that need an author (`recipe_detail_test.dart`, `recipe_editor_test.dart`) pump the app
+signed in as the demo author through a shared `test/support/demo_app.dart`. That helper uses the
+same `InMemoryAuthRepository` the demo build uses, so those tests exercise the real guard rather
+than a stubbed one.
+
+Evidence: 32/32 behavioural checks passed locally against PostgreSQL 18.6 (PGlite) on the merged
+migrations *before* the push, and CI then verified the whole thing — all eight jobs green in
+[38862331246](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38862331246): 98 tests, `analyze` with no issues, `dart format` 0 changed out of 42 files, and the same
+32 checks passing against `postgres:17`.
+
+The first push was red in the three jobs that compile Dart, for two reasons and no others: a
+positional argument passed to a named-only constructor and a duplicated import, both in the
+hand-written part of the merge. `db-behaviour` was already green on that run — the SQL half of the
+merge never had a broken state.
+
+---
+
+## 1b. Update — 2026-10-15 (later): search
+
+**Green run [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443), 75 tests, 28
+database checks.**
+
+S5 of the product spec. The job to be done behind the whole app is *"what can I make tonight?"*,
+and that means searching **inside the ingredient list** — the query `lentils` has to find the
+recipe whose ingredients say "1 cup red lentils". No PostgREST filter can express that: an array
+can be tested for containment, not for a substring of one of its elements. So the filtering had
+to move into the database, and that is the whole reason this is a migration and not a few lines
+of Dart.
+
+`supabase/migrations/006_recipe_search.sql` adds one function, `search_recipes`, and it is written
+to be as uninteresting as possible:
+
+| Property | Why |
+|---|---|
+| `security invoker` | The policies decide visibility, not the function. It contains no authorization logic at all — one boundary is debuggable, two that disagree are not. |
+| `set search_path = ''` + schema-qualified names | The same hardening 003 applies to the signup trigger; nobody can shadow `public.recipes`. |
+| A function, not a view | Check 2 forbids views in `public`, and a view would have to re-implement the visibility rule it can get wrong. |
+| `%` and `_` escaped in the query | A search for `50%` finds "50% off mince" instead of matching everything, and the SQL and in-memory implementations agree on what a needle means. |
+
+**Numbered 006, not 005.** PR #5 claims 005 for Storage, and nothing here depends on the order.
+
+New behavioural checks 22–28 cover what string-matching cannot: that anon and `authenticated`
+see only what the policies allow *through a search*, that matching is case-insensitive and
+reaches inside `text[]`, that the tag filter combines with the text query, that `%` is a literal,
+and that `max_rows` is clamped and `before` still paginates. Check 28 asserts the function's
+safety properties from `pg_proc`, so a later edit cannot quietly turn it into `security definer`.
+
+**Check 26 was wrong when first written and is worth recording**: it searched for `%%` — a bare
+`%` inside a RAISE string is a format placeholder, so the check was asserting against a query of
+two percents and passing without testing escaping at all. It now searches for a single `%`.
+
+Deliberate limits, all recorded in [`handoff/RECONCILIATION.md`](handoff/RECONCILIATION.md):
+substring matching, not semantic search or relevance ranking; title and ingredients, not
+description; exact tag matching; newest-first, so a search is never reordered by "best". It is a
+sequential scan — `ilike` cannot use an index — which is the right trade at zero rows, and the
+core-PostgreSQL upgrade path when it stops being one is a GIN index on `to_tsvector(...)`.
+
+---
+
+## 1a. Update — 2026-10-15: the product surface is real
+
+**Branch `arena/3ccdc2bb-foodcircle`, run
+[38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) (all 7 jobs
+green, `dart format` 0 changed, 55 tests).**
+
+The gap this closed was not plumbing: `RecipeRepository` already had `fetchFeed`, `fetchById`,
+`fetchMine`, `create` and `delete`, implemented twice (Supabase and in-memory), and the UI used
+exactly one of them. Two of the three destinations rendered "Not implemented yet", and tapping a
+recipe in the feed showed a snackbar saying the detail screen was not built.
+
+What changed:
+
+| Area | Before | Now |
+|---|---|---|
+| Recipe page | snackbar "not built yet" | `/feed/:id` and `/recipes/:id`: photo, description, servings / time / difficulty chips, a Private marker, author, tags, ingredients, numbered steps, delete for the author. `null` from the repository means "deleted or not yours" and the screen deliberately says neither. |
+| `/recipes` | `PlaceholderScreen` | your own recipe box via `fetchMine`, private rows included, with a New recipe action. |
+| Editor | did not exist | `/recipes/new` and `/recipes/:id/edit` share one validated form. Validation mirrors the `CHECK` constraints in migration `004` (title 1–120, servings 1–100, times 0–1440, ≤10 tags) so the database never has to refuse a submission. An edit keeps the image and `created_at` a row already has. |
+| `/profile` | `PlaceholderScreen` | identity (name, username, bio), a recipe count, and a way into the recipe box; "Not signed in" when there is no session. |
+| Sharing | the feed's tile, banner and empty/error views were private to `feed_screen.dart` | `lib/core/widgets/`: one list with the three states the spec asks for, one tile, one avatar, one demo banner. |
+| `responsive_framework` | §4.3's 🟡 item: decorative **and** wrong (its desktop band ended at 1920, so a 2560px monitor fell outside every breakpoint) | **removed**, dependency included. `responsive_shell.dart`'s two constants are the single source of truth. |
+
+New in the interface: `fetchProfile(id)` and `update(id, draft)` — the latter removes `author_id`
+and `image_url` from the update, so a recipe cannot quietly change hands and an edit cannot drop a
+photo the editor has no field for. `lib/core/session.dart` held `currentUserIdProvider`, the seam
+Phase 1b was to replace; no screen read an auth API directly.
+
+Two things this did **not** do, on purpose: **edit a profile** (`profiles_update_own` and
+`Profile.toUpdateJson` exist, but a form that cannot upload an avatar is not the form that
+ships) and **upload an image** (needs `005_storage.sql` — PR #5's territory).
+
+Evidence, in the repository's own idiom: every screen was exercised through the real provider
+graph in widget tests (`recipe_detail_test.dart`, `recipe_editor_test.dart`, `profile_test.dart`),
+the web build and the debug APK both built from this branch, and `format.log` is 0 changed.
+
+
+> **Read with §1c.** This section describes the state before the auth slice merged: the identity
+> seam was a stub in `lib/core/session.dart`, and a signed-out profile said "Not signed in". §1c
+> records what replaced both, and why.
 
 **Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
 analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
@@ -99,6 +227,9 @@ app on `ci-scaffold` reveals what the current template really looks like.
 ## 3. Inventory — what exists and what it actually does
 
 ### 3.1 Application code (615 LOC)
+
+> **Snapshot of v0.2 as analysed.** `lib/screens/placeholder_screen.dart` no longer exists and
+> four of the screens below are superseded — see §1a for what replaced them.
 
 | File | LOC | State | Notes |
 |---|---|---|---|
@@ -179,11 +310,11 @@ coin flip, and `python3 -m http.server` on a fetched `build/web` becomes a live 
 - **No auth flow or route guard.** `GoRouter` has no `redirect`, no `/sign-in` or `/sign-up`, no
   `errorBuilder`. An unauthenticated user cannot be distinguished from an authenticated one.
 - **No feature structure.** Five files total under `lib/`; no `features/`, `data/`, `core/`.
-- 🟡 `ResponsiveBreakpoints.builder` is **decorative and risky**: the shell reads
-  `MediaQuery.of(context).size.width` directly (`responsive_shell.dart:71`) while the breakpoint list
-  in `app.dart:42-48` ends the desktop band at **1920** — a 2560px monitor falls outside every
-  breakpoint. Either read the breakpoints properly (`ResponsiveBreakpoints.of(context)`) or drop the
-  dependency; keeping both is the worst option.
+- ✅ **Fixed 2026-10-15** — was 🟡: `ResponsiveBreakpoints.builder` was **decorative and risky**.
+  The shell read `MediaQuery.of(context).size.width` directly while the breakpoint list in
+  `app.dart` ended the desktop band at **1920**, so a 2560px monitor fell outside every breakpoint
+  it declared. The list and the dependency are gone; `responsive_shell.dart`'s two constants are
+  now the only definition. See §1a.
 - 🟡 `assets/` is declared and empty (`.gitkeep`); no images, icons, or splash configured.
 - ⚪ No dark theme, no localization setup, no a11y semantics, no analytics/crash reporting.
 
@@ -203,6 +334,10 @@ coin flip, and `python3 -m http.server` on a fetched `build/web` becomes a live 
 - ⚪ No `supabase/config.toml`, so `supabase start` (local dev DB) is not configured.
 
 ### 4.5 Product — 🔴 there is nothing to use
+
+> **Superseded 2026-10-15:** all three destinations are real and a recipe can be written,
+> read, edited and deleted from the app — the part still missing is anything that needs an
+> account, which is Phase 1b. See §1a. What follows is the v0.2 assessment it replaced.
 
 Three destinations (`/feed`, `/recipes`, `/profile`) render "Not implemented yet". **No user can sign
 up, create a recipe, see a recipe, or edit a profile.** There is no search, no social graph, no
@@ -334,6 +469,13 @@ included. Reconcile the inferred bucket rules before deployment; keep the rest o
 handoff review and explicit sign-off.
 
 ### Phase 2 — The actual product: Feed, Recipes, Profile (size: L)
+
+**Status (2026-10-15): the screens exist, and search with them; the gate below was not met.**
+Feed, recipe detail, the editor (minus images) and the profile are built and tested — see §1a —
+and search by title, ingredient and tag landed in §1b. The editor still has no image field,
+because uploads need `005_storage.sql` (PR #5). What is worth restating is
+the gate: these screens encode the inferences in `PRODUCT_SPEC.md`, so they are cheap to change
+now and expensive to change after Phase 3 builds on them.
 
 - Feed: public recipes, paginated (keyset on `created_at,id`), pull-to-refresh, author chips,
   loading/empty/error states.

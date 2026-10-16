@@ -1,18 +1,55 @@
 # FoodCircle Architecture
 
-> **Current continuation status (2026-10-14):** The repository has a data/feed foundation and an
-> inferred email/password auth + recipe-image-storage slice. The auth/storage slice was reconstructed
-> from this repository's roadmap because the authoritative handoff is missing; its source and SQL
-> are awaiting the next CI compile/test run. No Supabase project exists, and nothing is deployed.
-> `docs/handoff/RECONCILIATION.md` records the assumptions that still need the real handoff.
+> **Current continuation status (2026-10-16):** One app, not two parallel branches. The data/feed
+> foundation, the product surface (recipe page, recipe box, editor, search, profile) and the
+> inferred email/password auth + recipe-image-storage slice are integrated on one branch, and CI
+> verifies the tree that results. The auth/storage slice was reconstructed from this repository's
+> roadmap because the authoritative handoff is missing — it is verified, not approved. No Supabase
+> project exists, and nothing is deployed. `docs/handoff/RECONCILIATION.md` records the assumptions
+> that still need the real handoff.
 
 ## Stack
+- Flutter 3.10+ (Android / iOS / Web shared foundation)
+- Supabase (PostgreSQL + Auth + Storage) — connected and initialised when a project is
+  configured; the app runs on in-memory repositories when one is not.
+- GoRouter (navigation, including the auth redirect)
+- Riverpod (repositories, the feed, the recipe pages, and the session)
+- No responsive-layout package: the shell measures `MediaQuery` itself against the
+  two constants in `responsive_shell.dart`. `responsive_framework` was removed after
+  its breakpoint list turned out to be both unread and wrong at the top end.
 
-- Flutter (Android / iOS / Web)
-- Supabase (PostgreSQL + Auth + Storage), initialized only when URL and publishable/anon key are supplied
-- GoRouter for navigation and auth redirects
-- Riverpod for repository and session providers
-- ResponsiveFramework for breakpoints
+## Shared Foundation
+- `lib/main.dart` — entry point; initialises Supabase when configured, then runs the
+  app inside a `ProviderScope`.
+- `lib/app.dart` — `MaterialApp.router` and the `GoRouter` definition of record: the
+  auth routes, the `redirect` that sends you to sign-in when you ask for `/recipes` or
+  `/profile` without a session, and one `StatefulShellRoute` branch per destination,
+  each owning its own stack.
+- `lib/navigation/responsive_shell.dart` — responsive navigation shell plus the
+  shared destination list and the two layout breakpoint constants.
+- `lib/core/config/env.dart` — the `--dart-define` contract, and whether a project was
+  configured at all.
+- `lib/core/providers.dart` — every provider the screens read. Two of them are the
+  identity seam: `authUserProvider` (the session, including the synchronously restored
+  one at startup) and `currentUserIdProvider` (who the app is acting as — null when
+  nobody is, which is a supported state and not an error).
+- `lib/core/router/` — the auth paths, the return-target validation that keeps an auth
+  link from becoming an open redirect, and the refresh that re-runs the redirect when
+  the session changes.
+- `lib/core/widgets/` — the widgets that keep the screens consistent: a recipe list
+  with its three states, the demo-mode banner, the empty/error view, and the initials
+  avatar.
+- `lib/data/` — `models/` (Recipe, Profile, AuthUser, RecipeImageUpload) and
+  `repositories/`: the auth and recipe interfaces, their Supabase adapters, and the
+  in-memory fakes the demo build and the widget tests run on.
+- `lib/features/` — `feed/` (public recipes), `recipes/` (recipe page, recipe box,
+  editor), `profile/` (identity, your recipe box, sign-out), `auth/` (sign-in,
+  sign-up).
+- `android/app/` — Android manifest and build config.
+- `ios/Runner/` — iOS runner assets and config placeholders.
+- `web/index.html` — web entry that boots the generated `flutter_bootstrap.js`.
+- `assets/` — empty asset directory; `pubspec.yaml` declares it, so it must exist
+  or `flutter pub get` fails.
 
 ## Application startup and providers
 
