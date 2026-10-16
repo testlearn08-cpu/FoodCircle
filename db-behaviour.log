@@ -1,0 +1,152 @@
+== server ==
+PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+
+== phase 1: upgrade path ==
+  a database that already ran the first 3 migrations
+   applying supabase/tests/00_auth_stub.sql
+   applying supabase/migrations/001_initial_schema.sql
+psql:supabase/migrations/001_initial_schema.sql:44: NOTICE:  policy "profiles_read_all" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:48: NOTICE:  policy "profiles_insert_own" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:52: NOTICE:  policy "profiles_update_own" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:56: NOTICE:  policy "profiles_delete_own" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:61: NOTICE:  policy "recipes_read_public" for relation "public.recipes" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:65: NOTICE:  policy "recipes_insert_own" for relation "public.recipes" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:69: NOTICE:  policy "recipes_update_own" for relation "public.recipes" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:73: NOTICE:  policy "recipes_delete_own" for relation "public.recipes" does not exist, skipping
+   applying supabase/migrations/002_indexes_and_triggers.sql
+psql:supabase/migrations/002_indexes_and_triggers.sql:19: NOTICE:  trigger "update_profiles_updated_at" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/002_indexes_and_triggers.sql:24: NOTICE:  trigger "update_recipes_updated_at" for relation "public.recipes" does not exist, skipping
+   applying supabase/migrations/003_auth_helpers.sql
+psql:supabase/migrations/003_auth_helpers.sql:14: NOTICE:  view "auth_users" does not exist, skipping
+psql:supabase/migrations/003_auth_helpers.sql:67: NOTICE:  trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+   applying supabase/tests/05_legacy_seed.sql
+  the newer migrations, applied on top
+   applying supabase/migrations/004_recipe_metadata.sql
+   applying supabase/migrations/005_storage.sql
+psql:supabase/migrations/005_storage.sql:34: NOTICE:  policy "recipe_images_read_public" for relation "storage.objects" does not exist, skipping
+psql:supabase/migrations/005_storage.sql:41: NOTICE:  policy "recipe_images_insert_own" for relation "storage.objects" does not exist, skipping
+psql:supabase/migrations/005_storage.sql:51: NOTICE:  policy "recipe_images_update_own" for relation "storage.objects" does not exist, skipping
+psql:supabase/migrations/005_storage.sql:65: NOTICE:  policy "recipe_images_delete_own" for relation "storage.objects" does not exist, skipping
+   applying supabase/migrations/006_recipe_search.sql
+psql:supabase/tests/20_migration_upgrade.sql:31: NOTICE:  ok  U1. ingredients and steps are arrays, and the jsonb columns are gone
+DO
+psql:supabase/tests/20_migration_upgrade.sql:56: NOTICE:  ok  U2. existing ingredients and steps survived the conversion, commas and quotes included
+DO
+psql:supabase/tests/20_migration_upgrade.sql:71: NOTICE:  ok  U3. an empty list converts to an empty array, not to {""}
+DO
+psql:supabase/tests/20_migration_upgrade.sql:88: NOTICE:  ok  U4. timestamps are populated and non-null
+DO
+psql:supabase/tests/20_migration_upgrade.sql:106: NOTICE:  ok  U5. the policies still work on the upgraded schema
+DO
+psql:supabase/tests/20_migration_upgrade.sql:135: NOTICE:  ok  U6. migration 005 creates the bucket and all four policies on upgrade
+DO
+
+== phase 2: fresh database ==
+NOTICE:  drop cascades to 6 other objects
+DETAIL:  drop cascades to table profiles
+drop cascades to table recipes
+drop cascades to function update_updated_at()
+drop cascades to function handle_new_user()
+drop cascades to trigger on_auth_user_created on table auth.users
+drop cascades to function search_recipes(text,text,timestamp with time zone,integer)
+NOTICE:  drop cascades to 5 other objects
+DETAIL:  drop cascades to table auth.users
+drop cascades to function auth.uid()
+drop cascades to policy recipe_images_insert_own on table storage.objects
+drop cascades to policy recipe_images_update_own on table storage.objects
+drop cascades to policy recipe_images_delete_own on table storage.objects
+NOTICE:  drop cascades to 3 other objects
+DETAIL:  drop cascades to table storage.buckets
+drop cascades to table storage.objects
+drop cascades to function storage.foldername(text)
+   applying supabase/tests/00_auth_stub.sql
+   applying supabase/migrations/001_initial_schema.sql
+psql:supabase/migrations/001_initial_schema.sql:44: NOTICE:  policy "profiles_read_all" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:48: NOTICE:  policy "profiles_insert_own" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:52: NOTICE:  policy "profiles_update_own" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:56: NOTICE:  policy "profiles_delete_own" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:61: NOTICE:  policy "recipes_read_public" for relation "public.recipes" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:65: NOTICE:  policy "recipes_insert_own" for relation "public.recipes" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:69: NOTICE:  policy "recipes_update_own" for relation "public.recipes" does not exist, skipping
+psql:supabase/migrations/001_initial_schema.sql:73: NOTICE:  policy "recipes_delete_own" for relation "public.recipes" does not exist, skipping
+   applying supabase/migrations/002_indexes_and_triggers.sql
+psql:supabase/migrations/002_indexes_and_triggers.sql:19: NOTICE:  trigger "update_profiles_updated_at" for relation "public.profiles" does not exist, skipping
+psql:supabase/migrations/002_indexes_and_triggers.sql:24: NOTICE:  trigger "update_recipes_updated_at" for relation "public.recipes" does not exist, skipping
+   applying supabase/migrations/003_auth_helpers.sql
+psql:supabase/migrations/003_auth_helpers.sql:14: NOTICE:  view "auth_users" does not exist, skipping
+psql:supabase/migrations/003_auth_helpers.sql:67: NOTICE:  trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+   applying supabase/migrations/004_recipe_metadata.sql
+   applying supabase/migrations/005_storage.sql
+psql:supabase/migrations/005_storage.sql:34: NOTICE:  policy "recipe_images_read_public" for relation "storage.objects" does not exist, skipping
+psql:supabase/migrations/005_storage.sql:41: NOTICE:  policy "recipe_images_insert_own" for relation "storage.objects" does not exist, skipping
+psql:supabase/migrations/005_storage.sql:51: NOTICE:  policy "recipe_images_update_own" for relation "storage.objects" does not exist, skipping
+psql:supabase/migrations/005_storage.sql:65: NOTICE:  policy "recipe_images_delete_own" for relation "storage.objects" does not exist, skipping
+   applying supabase/migrations/006_recipe_search.sql
+
+== behavioural RLS suite ==
+INSERT 0 2
+INSERT 0 3
+INSERT 0 2
+psql:supabase/tests/10_rls_behaviour.sql:59: NOTICE:  ok  1. RLS is enabled on public.profiles and public.recipes
+DO
+psql:supabase/tests/10_rls_behaviour.sql:72: NOTICE:  ok  2. the public schema contains no views (no auth.users leak)
+DO
+psql:supabase/tests/10_rls_behaviour.sql:98: NOTICE:  ok  3. signup provisions a profile with the requested username and display name
+DO
+psql:supabase/tests/10_rls_behaviour.sql:116: NOTICE:  ok  4. a duplicate username does not abort signup (user_33333333333333333333333333333333 was taken)
+DO
+psql:supabase/tests/10_rls_behaviour.sql:138: NOTICE:  ok  5. signup without metadata derives a username and display name
+DO
+psql:supabase/tests/10_rls_behaviour.sql:160: NOTICE:  ok  6. the updated_at trigger overwrites a client-supplied timestamp
+DO
+psql:supabase/tests/10_rls_behaviour.sql:183: NOTICE:  ok  7. a recipe always has an author
+DO
+psql:supabase/tests/10_rls_behaviour.sql:204: NOTICE:  ok  8. a recipe cannot be authored by a user that does not exist
+DO
+psql:supabase/tests/10_rls_behaviour.sql:223: NOTICE:  ok  9. anon sees public recipes and nothing else
+DO
+psql:supabase/tests/10_rls_behaviour.sql:239: NOTICE:  ok 10. anon cannot reach a private recipe, even by id
+DO
+psql:supabase/tests/10_rls_behaviour.sql:256: NOTICE:  ok 11. an author reads their own private recipe
+DO
+psql:supabase/tests/10_rls_behaviour.sql:279: NOTICE:  ok 12. another signed-in user sees public recipes but not private ones
+DO
+psql:supabase/tests/10_rls_behaviour.sql:296: NOTICE:  ok 13. any signed-in user can read a profile
+DO
+psql:supabase/tests/10_rls_behaviour.sql:310: NOTICE:  ok 14. service_role bypasses RLS
+DO
+psql:supabase/tests/10_rls_behaviour.sql:341: NOTICE:  ok 15. anon cannot insert a recipe (RLS, not a missing grant)
+DO
+psql:supabase/tests/10_rls_behaviour.sql:377: NOTICE:  ok 16. an author can insert their own recipe, but not one attributed to someone else
+DO
+psql:supabase/tests/10_rls_behaviour.sql:396: NOTICE:  ok 17. a user cannot update someone else's recipe
+DO
+psql:supabase/tests/10_rls_behaviour.sql:415: NOTICE:  ok 18. an author can update their own recipe
+DO
+psql:supabase/tests/10_rls_behaviour.sql:433: NOTICE:  ok 19. a user cannot delete someone else's recipe
+DO
+psql:supabase/tests/10_rls_behaviour.sql:478: NOTICE:  ok 20. profile writes are limited to the owner on update and insert
+DO
+psql:supabase/tests/10_rls_behaviour.sql:508: NOTICE:  ok 21. deleting an account cascades to its profile and recipes
+DO
+psql:supabase/tests/10_rls_behaviour.sql:537: NOTICE:  ok 22. the recipe-images bucket is public and restricted to supported image uploads
+DO
+psql:supabase/tests/10_rls_behaviour.sql:552: NOTICE:  ok 23. public clients can read images from the public recipe bucket
+DO
+psql:supabase/tests/10_rls_behaviour.sql:611: NOTICE:  ok 24. authenticated users can write only within their own image folder
+DO
+psql:supabase/tests/10_rls_behaviour.sql:638: NOTICE:  ok 25. authenticated users can delete only images in their own folder
+DO
+psql:supabase/tests/10_rls_behaviour.sql:817: NOTICE:  ok 26. anon can search ingredients, and only sees public matches
+psql:supabase/tests/10_rls_behaviour.sql:817: NOTICE:  ok 27. search respects the visibility rule for signed-in users too
+psql:supabase/tests/10_rls_behaviour.sql:817: NOTICE:  ok 28. search is case-insensitive over titles and ingredients
+psql:supabase/tests/10_rls_behaviour.sql:817: NOTICE:  ok 29. the tag filter narrows a search and combines with the text query
+psql:supabase/tests/10_rls_behaviour.sql:817: NOTICE:  ok 30. percent and underscore in a query are literals, not wildcards
+psql:supabase/tests/10_rls_behaviour.sql:817: NOTICE:  ok 31. max_rows is clamped and before paginates, as the feed contract says
+DO
+psql:supabase/tests/10_rls_behaviour.sql:852: NOTICE:  ok 32. search_recipes is SECURITY INVOKER with a pinned search_path
+DO
+psql:supabase/tests/10_rls_behaviour.sql:885: NOTICE:  ok 33. taking a username somebody else has is refused with a 23505
+DO
+
+All database tests passed.

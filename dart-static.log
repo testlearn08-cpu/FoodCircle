@@ -1,0 +1,13 @@
+  ok  client initialization uses only the publishable/anon key
+  ok  Supabase credentials come from the publishable-key dart-define
+  ok  the feed remains public and account routes are gated
+  ok  router redirects and refreshes when auth state changes
+  ok  the Supabase adapter uses password auth and sends the profile username
+  ok  recipe image uploads use an authenticated user folder and no overwrite
+  ok  profile edits go through the draft, and cannot drop an avatar
+  ok  the profile write keeps the avatar and explains a taken username
+  ok  the in-memory profile write keeps the avatar it has no field for
+  ok  the no-project path is explicitly ephemeral demo auth
+  ok  client configuration has no service_role key define
+
+Dart static checks: 11/11 passed
