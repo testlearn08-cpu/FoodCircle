@@ -56,6 +56,12 @@ void main() {
   });
 
   group('profiles policies', () {
+    test('the username is unique and required', () {
+      // The edit screen's "That username is taken." is a translation of this constraint's 23505.
+      // Without it the message would be unreachable and two people could share a handle.
+      expect(schema, contains('username text unique not null'));
+    });
+
     test('readable by anyone', () {
       expect(
         schema,

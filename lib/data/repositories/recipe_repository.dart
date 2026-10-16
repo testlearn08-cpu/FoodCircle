@@ -2,7 +2,8 @@ import '../models/profile.dart';
 import '../models/recipe.dart';
 import '../models/recipe_image_upload.dart';
 
-/// Everything the UI is allowed to ask of recipes.
+/// Everything the UI is allowed to ask of the backend: recipes, and the profiles that their
+/// authors are read through.
 ///
 /// The UI depends on this interface, never on Supabase, which is what lets the app run with no
 /// project configured ([InMemoryRecipeRepository]) and lets widget tests stay hermetic.
@@ -45,6 +46,17 @@ abstract class RecipeRepository {
   /// own row.
   Future<Profile?> fetchProfile(String id);
 
+  /// Replaces the caller's own editable profile fields.
+  ///
+  /// An update, never an insert: the row is created by the `handle_new_user` trigger when the
+  /// account is, so there is nothing for the app to create. `profiles_update_own` restricts the
+  /// write to the caller's own row, which is why a wrong [ProfileDraft.id] fails rather than
+  /// editing somebody else.
+  ///
+  /// Throws a [ProfileUpdateFailure] when the username is already taken — the one refusal a
+  /// person can fix by typing something else, and therefore the one the UI has to explain.
+  Future<Profile> updateProfile(ProfileDraft draft);
+
   /// Uploads a recipe image and returns its public URL for `RecipeDraft.imageUrl`.
   ///
   /// The current bucket name, public visibility, MIME allowlist, size limit, and user-folder path
@@ -60,4 +72,17 @@ abstract class RecipeRepository {
   Future<Recipe> update(String id, RecipeDraft draft);
 
   Future<void> delete(String id);
+}
+
+/// A safe-to-display error from a profile write.
+///
+/// Separate from a raw [StateError] policy refusal because this one is *for* the person typing:
+/// it has a message worth showing in the form, next to the field that caused it.
+class ProfileUpdateFailure implements Exception {
+  const ProfileUpdateFailure(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

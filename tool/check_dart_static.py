@@ -64,6 +64,37 @@ CHECKS = [
         ),
     ),
     (
+        "profile edits go through the draft, and cannot drop an avatar",
+        "lib/data/models/profile.dart",
+        (
+            "class ProfileDraft",
+            "'username': username",
+            "'display_name': displayName",
+            "'bio': bio",
+        ),
+    ),
+    (
+        "the profile write keeps the avatar and explains a taken username",
+        "lib/data/repositories/supabase_recipe_repository.dart",
+        (
+            "Future<Profile> updateProfile(ProfileDraft draft)",
+            ".from('profiles')",
+            ".update(draft.toUpdateJson())",
+            ".eq('id', draft.id)",
+            "if (error.code == '23505')",
+            "ProfileUpdateFailure('That username is taken.')",
+        ),
+    ),
+    (
+        "the in-memory profile write keeps the avatar it has no field for",
+        "lib/data/repositories/in_memory_recipe_repository.dart",
+        (
+            "Future<Profile> updateProfile(ProfileDraft draft)",
+            "avatarUrl: existing.avatarUrl",
+            "ProfileUpdateFailure('That username is taken.')",
+        ),
+    ),
+    (
         "the no-project path is explicitly ephemeral demo auth",
         "lib/data/repositories/in_memory_auth_repository.dart",
         (

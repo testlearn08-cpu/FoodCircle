@@ -850,3 +850,36 @@ begin
   raise notice 'ok 32. search_recipes is SECURITY INVOKER with a pinned search_path';
 end
 $$;
+
+-- ---------------------------------------------------------------------------------------------
+-- 33: the username is unique, and taking somebody else's is a 23505
+-- ---------------------------------------------------------------------------------------------
+--
+-- The profile editor turns "username already taken" into a sentence, and it recognises it by
+-- SQLSTATE. This asserts the state the client matches on is the one Postgres actually raises, so
+-- the message cannot silently become unreachable. Note what is *not* here: a signup cannot hit
+-- this, because `handle_new_user` falls back to `user_<id>` for a name that is taken (check 4).
+
+do $$
+declare
+  dave uuid := '44444444-4444-4444-4444-444444444444';
+  refusal text;
+begin
+  perform set_config('role', 'none', true);
+
+  begin
+    update public.profiles
+       set username = 'alice_cooks'
+     where id = dave and username <> 'alice_cooks';
+    raise exception 'a profile took a username that belongs to somebody else';
+  exception
+    when unique_violation then
+      refusal := sqlstate;
+  end;
+
+  if refusal <> '23505' then
+    raise exception 'expected 23505 for a duplicate username, got %', refusal;
+  end if;
+  raise notice 'ok 33. taking a username somebody else has is refused with a 23505';
+end
+$$;

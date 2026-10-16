@@ -11,12 +11,13 @@ import '../../data/models/recipe.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../recipes/recipe_providers.dart';
 
-/// S6 in the product spec, reading half of it, plus the account surface (S7's sign-out).
+/// S6 in the product spec, plus the account surface (S7's sign-out).
 ///
-/// What is here: your identity (name, email, username, bio), a way into your recipe box, and the
-/// way out — signing out. What is not, yet: editing any of it, and the avatar upload that goes
-/// with it — `profiles_update_own` and `Profile.toUpdateJson` exist, but a form that cannot be
-/// saved is worse than no form.
+/// What is here: your identity (name, email, username, bio), a way to change the three fields
+/// that are yours to change (`/profile/edit`), a way into your recipe box, and the way out —
+/// signing out. What is still not: the avatar, because migration 005's bucket is recipe images
+/// and there is no bucket for avatars. The screen says so rather than offering a field it cannot
+/// save.
 ///
 /// It absorbed the account screen that PR #5 added, rather than sitting next to it: one
 /// destination called "Profile" showing your name and, two taps away, your email is a worse
@@ -33,6 +34,18 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Profile'),
         bottom: demoBannerOrNull(),
+        actions: <Widget>[
+          // Enabled only with a session: without one there is no row to edit, and the router
+          // would send the tap to sign-in anyway.
+          IconButton(
+            key: const Key('profile-edit'),
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit profile',
+            onPressed: userId == null
+                ? null
+                : () => context.push('/profile/edit'),
+          ),
+        ],
       ),
       body: userId == null
           ? const CenteredMessage(
