@@ -1,0 +1,102 @@
+name: Format
+
+# Why this workflow exists
+# ------------------------
+# `dart format --set-exit-if-changed` is a gate in ci.yml, and the environment this repository is
+# developed from has no Dart SDK and cannot install one — pub.dev and the SDK download hosts are
+# unreachable, and there is no npm or PyPI package that ships the formatter. A formatting
+# disagreement would therefore be one bit of information: format.log names the files that would
+# change and never says how.
+#
+# So CI formats the tree and publishes the result to `ci-formatted`, the same pattern
+# ci-artifacts / preview / ci-scaffold already use. From the sandbox:
+#
+#   git fetch origin ci-formatted
+#   git log -1 --format=%B FETCH_HEAD      # "Formatted 30 files (2 changed) in …"
+#   git diff FETCH_HEAD -- lib test        # exactly what the formatter would do
+#
+# Adopt the result by hand; never merge `ci-formatted`, and never build on it. The next run
+# force-pushes over it, exactly like the other bot branches.
+#
+# It runs for `arena/**` pushes because that is where the work happens; `workflow_dispatch` is the
+# manual escape hatch (it needs this file on the default branch first, so it starts out as a
+# push-only workflow).
+
+on:
+  push:
+    branches: ['arena/**']
+  workflow_dispatch:
+
+# Needed to push the bot branch.
+permissions:
+  contents: write
+
+concurrency:
+  group: format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: Publish canonical formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Pinned deliberately. The first version of this workflow used `channel: stable` like
+      # ci.yml and produced the *old* short formatting style — a different Dart reached it (the
+      # gate in ci.yml, which formats this repository as the tall style, is the authority). The
+      # version that ran is written into the bot branch's commit message, so a disagreement
+      # between this job and the gate is visible rather than silent.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+      - name: flutter pub get
+        run: |
+          set -o pipefail
+          # The gate in ci.yml formats after `pub get`. Matching it exactly is the point: the
+          # formatter resolves a file's language version from `.dart_tool/package_config.json`.
+          flutter pub get
+      - name: dart format .
+        run: |
+          set -o pipefail
+          # Flutter's own dart, resolved through the flutter the action installed, rather than
+          # whatever `dart` happens to be first on PATH.
+          DART_BIN="$(dirname "$(command -v flutter)")/dart"
+          if [ ! -x "$DART_BIN" ]; then
+            DART_BIN="$(command -v dart)"
+          fi
+          echo "PATH dart: $(command -v dart)"
+          echo "using: $DART_BIN"
+          "$DART_BIN" --version 2>&1 | tee "$RUNNER_TEMP/version.log"
+          # No --set-exit-if-changed: this job exists to produce the formatted tree, and the gate
+          # that refuses an unformatted one is in ci.yml.
+          "$DART_BIN" format . 2>&1 | tee "$RUNNER_TEMP/format.log"
+          # One line per tool, read back by the next step from the file rather than passed through
+          # $GITHUB_OUTPUT: the summary is tool output, and a shell script is the wrong place to
+          # put it a second time.
+          {
+            echo "dart: $("$DART_BIN" --version 2>&1 | tail -n 1)"
+            tail -n 1 "$RUNNER_TEMP/format.log"
+          } > "$RUNNER_TEMP/summary.txt"
+      - name: Publish the formatted tree to ci-formatted
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Read, never re-interpolated into this script: the file holds tool output, and the
+          # previous version put it inside the `run:` block where any quote or `$` in it would
+          # have been shell.
+          SUMMARY="$(cat "$RUNNER_TEMP/summary.txt")"
+          SUBJECT="$(head -n 1 "$RUNNER_TEMP/summary.txt")"
+          # An orphan commit, like ci-artifacts: the branch is a snapshot to read, not a history.
+          git checkout -q --orphan ci-formatted
+          git add -A
+          # `git log -1 --format=%B FETCH_HEAD` answers both "what changed" and "formatted by
+          # what", which is the question that mattered the first time this job ran.
+          git commit -q \
+            -m "formatted: ${GITHUB_REF_NAME} @ ${GITHUB_SHA:0:7} — ${SUBJECT}" \
+            -m "$SUMMARY"
+          git push -q -f \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" \
+            ci-formatted
+          echo "published ci-formatted"

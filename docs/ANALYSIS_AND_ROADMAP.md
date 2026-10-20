@@ -1,0 +1,597 @@
+# FoodCircle — Full Analysis & Continuation Plan
+
+> Original analysis: 2026-10-14 · Current continuation branch: `arena/b4829743-foodcircle` · Base: `d5b7e573`
+> The baseline inventory below predates Phase 1a; see the continuation update and progress table for current status.
+
+---
+
+## 1. TL;DR — where the project actually stands
+
+**Continuation update (2026-10-14): this section is now a historical baseline, not a current
+inventory.** Since the original analysis below, Phase 1a added the recipe data layer and public feed.
+Phase 1b auth and Phase 1c Storage policies were reconstructed from inferred repository docs and
+verified by CI run [38560095418](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38560095418)
+(PR #5). With explicit user authorization, this branch now also has a repository-only image-upload
+adapter based strictly on the existing inferred `recipe-images` bucket contract; the adapter's
+follow-up CI run is the validation gate for that change.
+
+Current gates: no authoritative handoff is present; no Supabase project exists; no migration has
+been deployed; location, notifications and offline still have no schema; and Phase 2 (recipe detail,
+editor, search) remains blocked on the handoff and explicit sign-off. The bucket visibility, size,
+MIME allowlist and folder convention remain provisional. The upload editor/UI and its progress,
+retry, resizing and cleanup behavior are not part of this repository-only slice. The repository's
+existing CI and local Python guards are the only available verification path because Flutter/Dart
+are not installed in this sandbox.
+
+The baseline inventory and analysis that follow describe the earlier pre-Phase-1a snapshot unless
+updated in the progress table below. Do not use their old source counts or "no auth" statements as
+current facts.
+
+Three things changed my read versus what the existing docs say, and all three are verified:
+
+1. **The docs are stale in the project's favour.** `ARCHITECTURE.md` and `DEVELOPMENT_STATUS.md`
+   both say "nothing has ever been compiled". That is no longer true: **CI run
+   [38525965333](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38525965333) passed
+   `flutter pub get`, `flutter analyze`, and `flutter test` on 2026-10-14.** The code compiles and
+   the widget tests pass. That is a real milestone and the docs should stop hedging about it.
+2. **The local environment is permanently blind, but CI is a usable build server.** `pub.dev` and
+   `storage.googleapis.com` are unreachable from the sandbox (only `github.com`, `registry.npmjs.org`,
+   `pypi.org` and `files.pythonhosted.org` respond), so no Flutter SDK can be installed here — that
+   is now a confirmed constraint, not a guess. However, `git`/`gh`/`api.github.com` work fully, and
+   Actions minutes are free on this public repo. **GitHub Actions is therefore the compiler, the test
+   runner, *and* potentially the build/preview host for this project.**
+3. **CI is currently write-only from here.** I can see *that* a job failed (step-level conclusions via
+   the API) but I **cannot read job logs** — the log endpoint redirects to
+   `results-receiver.actions.githubusercontent.com`, which is outside the sandbox allowlist
+   (`gh run view --log` returns `EOF`). Until this is fixed, every CI failure is a blind guess.
+   Fixing it is task **P0.1** and it gates almost everything else.
+
+**Verdict:** the foundation is sound enough to build on — do not rewrite it. The next move is not
+"more features", it is **making the feedback loop real** (build artifacts, readable logs, runnable
+app) and then **laying a real data + auth foundation**, because today there is no app to add features
+to.
+
+---
+
+### Progress log
+
+| Item | State | Evidence |
+|---|---|---|
+| P0.1 CI exports logs + artifacts to `ci-artifacts`, runs on `arena/**`, `workflow_dispatch` | ✅ done | run 38535122523; logs readable from the sandbox via `git fetch origin ci-artifacts` |
+| P0.2 `flutter build web` → `preview` branch, served as a live preview | ✅ done | run 38534656981 built and published `build/web`; served locally and verified asset-by-asset |
+| P0.3 `flutter build apk --debug` job | ✅ done | run 38536020761: `✓ Built build/app/outputs/flutter-apk/app-debug.apk` (~230 s) |
+| P0.4 Regenerate platform scaffolding via `flutter create` | ✅ done | 64 files added; my hand-written manifest diffs against the pristine template by exactly our three intended lines |
+| P0.5 `analysis_options.yaml` + `flutter_lints` + `dart format` gate | ✅ done | first run surfaced 5 real lints and 2 unformatted files — all fixed; `dart format` is now a gate |
+| P0.6 Docs rewritten to match reality | ✅ done | README, `ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md` banners |
+| Phase 0.5 Behavioural SQL tests (Postgres service container) | ✅ done | `db-behaviour` job applies the migrations to `postgres:17` and runs 21 behavioural checks as `anon` / `authenticated` / `service_role`; `supabase/tests/run.sh` |
+| Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
+| Phase 2a Product surface: recipe page, recipe box, editor, profile | ✅ done | every destination is real and a recipe can be written from the app; green run [38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) |
+| Phase 2b Search: title + ingredient text, tag filter | ✅ done | migration 006 + 7 behavioural checks; 75 tests, green run [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443) |
+| Phase 2c Profile editing: display name, username, bio | ✅ done | green run [38874039571](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38874039571) — 111 tests, 33 database checks |
+| Phase 1b Auth (screens, session, route guard) | ✅ done, merged | Supabase adapter + ephemeral fake, `/sign-in`, `/sign-up`, auth-state redirect refresh, sign-out. Verified by PR #5's green run `38560095418`; merged into `main` as `db33dd3`, then integrated here (§1c). |
+| Phase 1c Migration 005 storage bucket + policies | ✅ done, merged | inferred public `recipe-images` bucket, reads public and writes confined to the authenticated user's UUID folder, plus the repository upload adapter. Not deployed and still rewritable. |
+
+---
+
+## 1d. Update — 2026-10-16 (later): the profile you can edit
+
+**Green run [38874039571](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38874039571), 111 tests, 33 database checks.**
+
+The last deliberate gap on the product surface. `profiles` has had `profiles_update_own` since
+migration 001, `Profile` has had a write payload since the data layer landed, and nothing called
+either — so a username typo at signup was permanent, and the bio the profile page showed could
+not be written from anywhere.
+
+| Decision | Why |
+|---|---|
+| The write payload moves to a new `ProfileDraft`, and `Profile`'s is deleted | `Profile.toUpdateJson()` wrote `avatar_url`, so any caller would have nulled the avatar of everyone who has one. A draft that cannot carry an avatar cannot destroy one — and the in-memory adapter now preserves the column explicitly, so the demo build agrees. |
+| Usernames get a message: `ProfileUpdateFailure('That username is taken.')`, from SQLSTATE 23505 | It is the one refusal a person can fix by typing something else, and therefore the one the form owes an explanation for. Behavioural check 33 asserts the state the client matches on is the one Postgres actually raises, so the message cannot silently become unreachable. |
+| Signup still cannot hit it | `handle_new_user` falls back to `user_<id>` for a taken name (check 4). Worth stating because it is why check 33 has to update a profile to provoke a 23505 at all. |
+| The editor's limits (username 1–30, display name ≤80, bio ≤2000) are the client's own | Migration 001 declares `username TEXT UNIQUE NOT NULL` and nothing else about these columns: there is no CHECK to mirror, so the numbers are inferences, not rules. |
+| A save invalidates the feed and the recipe box, not just the profile | `_withAuthors` copies the author's name onto every recipe read, so a renamed author is stale everywhere their name appears. |
+| The avatar is still not editable, and the screen does not offer a field for it | 005's bucket is recipe images; there is no bucket for avatars, and an upload to a nonexistent bucket fails on the device of whoever taps it first. |
+
+The screen also has a state the routes did not have before: a profile row that does not exist is
+not something to edit, so `EditProfileScreen` says so instead of presenting a form that could not
+save. The route is `/profile/edit`, inside the shell's profile branch, and the guard that covers
+`/profile/**` covers it — a signed-out visitor is sent to sign in rather than handed an editor.
+
+Local evidence before the push, in the order it was produced: 33/33 behavioural checks on
+PostgreSQL 18.6 (PGlite), 11/11 Dart static guardrails (three of them new, pinning the draft's
+payload, the avatar-preserving write and the 23505 translation), 35 SQL-expectation assertions
+with 5 scoped to one migration — and a bracket/imports/implements pre-check over all 44 Dart
+files, which is what caught `test/feed_test.dart`'s fake repository missing the new interface
+member before CI would have.
+
+Two CI iterations were needed, both recorded because both are the kind of thing this repository
+keeps happening: the first test asserted `find.text('Ana')` inside the editor and found the
+field's own hint as well as its content (a form's hints are the demo profile's values), and four
+hand-wrapped lines failed the format gate because the stable formatter keeps a line inline when it
+fits in 80 columns. Both fixes are in `b29b972` and `1b92891`.
+
+---
+
+## 1c. Update — 2026-10-16: the two branches are one app now
+
+**Integration, not a feature.** `main` moved while this branch was being built: PR #5 landed the
+auth screens, session-aware routing and the migration `005` storage policies, and was merged as
+`db33dd3`. This branch had the product surface (§1a) and search (§1b). Both halves were green on
+their own; neither was green with the other, and 15 files conflicted.
+
+The interesting part is that the halves were built from opposite ends. §1a wrote screens against a
+placeholder identity seam (`lib/core/session.dart`) on the promise that Phase 1b would replace its
+body without touching the screens. Phase 1b landed with its own identity provider and its own
+sign-out screen. Both promises held, which is what made the merge a set of decisions rather than a
+rewrite:
+
+| Decision | Why |
+|---|---|
+| One identity seam: `currentUserIdProvider` moves into `lib/core/providers.dart`, derived from `authUserProvider`; `lib/core/session.dart` is deleted | The screens never read anything but `currentUserIdProvider`, so the swap is an import change. Null keeps its old meaning — nobody in particular — which is now the signed-out browser the policies already allow. |
+| The account surface folds into the profile page; `features/auth/account_screen.dart` is deleted | "Profile" showing your name, with your email two taps away on a second screen, is a worse screen than one that shows both. The sign-out key and the email text are unchanged, so the auth tests still describe it. |
+| The account card is the profile page's footer — outside the scroll and outside the profile-row branch | Signing out must not depend on your `profiles` row having loaded, or a profile that failed to load is an account you cannot leave. It also makes the email assertion independent of demo fixtures. |
+| `/recipes` stays "the recipes you wrote", and the router guard now covers it | It is the account's own data, and the guard is the same one that protects `/profile`. The screens keep their signed-out branch for direct pumps, but the router no longer reaches it. |
+| The demo sign-in identity is the seeded demo author (`demo-ana`, `InMemoryAuthRepository.demoUserId`) | A demo that signs you in as a stranger who owns nothing cannot demo the app: signing in makes you the author of the recipes already in the feed. Demo-only — the Supabase path uses the real session's UUID. |
+| The search checks are renumbered 26–32, after storage's 22–25 | Both suites are kept in full. `supabase/tests/10_rls_behaviour.sql` now runs 32 checks, and `tool/check_sql_expectations.py` knows `005` and `006` as separate files. |
+| `responsive_framework` stays removed and its breakpoint list does not come back with `main`'s `app.dart` | §1a removed it for being unread and wrong at the top end. The merged `app.dart` is §1a's route table plus `main`'s `redirect` and refresh listenable. |
+
+Tests moved with the decisions: `test/profile_test.dart`'s signed-out cases now assert the
+*redirect* (`/profile` → sign-in, `/recipes` → sign-in) instead of a "Not signed in" screen, and the
+screen tests that need an author (`recipe_detail_test.dart`, `recipe_editor_test.dart`) pump the app
+signed in as the demo author through a shared `test/support/demo_app.dart`. That helper uses the
+same `InMemoryAuthRepository` the demo build uses, so those tests exercise the real guard rather
+than a stubbed one.
+
+Evidence: 32/32 behavioural checks passed locally against PostgreSQL 18.6 (PGlite) on the merged
+migrations *before* the push, and CI then verified the whole thing — all eight jobs green in
+[38862331246](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38862331246): 98 tests, `analyze` with no issues, `dart format` 0 changed out of 42 files, and the same
+32 checks passing against `postgres:17`.
+
+The first push was red in the three jobs that compile Dart, for two reasons and no others: a
+positional argument passed to a named-only constructor and a duplicated import, both in the
+hand-written part of the merge. `db-behaviour` was already green on that run — the SQL half of the
+merge never had a broken state.
+
+---
+
+## 1b. Update — 2026-10-15 (later): search
+
+**Green run [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443), 75 tests, 28
+database checks.**
+
+S5 of the product spec. The job to be done behind the whole app is *"what can I make tonight?"*,
+and that means searching **inside the ingredient list** — the query `lentils` has to find the
+recipe whose ingredients say "1 cup red lentils". No PostgREST filter can express that: an array
+can be tested for containment, not for a substring of one of its elements. So the filtering had
+to move into the database, and that is the whole reason this is a migration and not a few lines
+of Dart.
+
+`supabase/migrations/006_recipe_search.sql` adds one function, `search_recipes`, and it is written
+to be as uninteresting as possible:
+
+| Property | Why |
+|---|---|
+| `security invoker` | The policies decide visibility, not the function. It contains no authorization logic at all — one boundary is debuggable, two that disagree are not. |
+| `set search_path = ''` + schema-qualified names | The same hardening 003 applies to the signup trigger; nobody can shadow `public.recipes`. |
+| A function, not a view | Check 2 forbids views in `public`, and a view would have to re-implement the visibility rule it can get wrong. |
+| `%` and `_` escaped in the query | A search for `50%` finds "50% off mince" instead of matching everything, and the SQL and in-memory implementations agree on what a needle means. |
+
+**Numbered 006, not 005.** PR #5 claims 005 for Storage, and nothing here depends on the order.
+
+New behavioural checks 22–28 cover what string-matching cannot: that anon and `authenticated`
+see only what the policies allow *through a search*, that matching is case-insensitive and
+reaches inside `text[]`, that the tag filter combines with the text query, that `%` is a literal,
+and that `max_rows` is clamped and `before` still paginates. Check 28 asserts the function's
+safety properties from `pg_proc`, so a later edit cannot quietly turn it into `security definer`.
+
+**Check 26 was wrong when first written and is worth recording**: it searched for `%%` — a bare
+`%` inside a RAISE string is a format placeholder, so the check was asserting against a query of
+two percents and passing without testing escaping at all. It now searches for a single `%`.
+
+Deliberate limits, all recorded in [`handoff/RECONCILIATION.md`](handoff/RECONCILIATION.md):
+substring matching, not semantic search or relevance ranking; title and ingredients, not
+description; exact tag matching; newest-first, so a search is never reordered by "best". It is a
+sequential scan — `ilike` cannot use an index — which is the right trade at zero rows, and the
+core-PostgreSQL upgrade path when it stops being one is a GIN index on `to_tsvector(...)`.
+
+---
+
+## 1a. Update — 2026-10-15: the product surface is real
+
+**Branch `arena/3ccdc2bb-foodcircle`, run
+[38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) (all 7 jobs
+green, `dart format` 0 changed, 55 tests).**
+
+The gap this closed was not plumbing: `RecipeRepository` already had `fetchFeed`, `fetchById`,
+`fetchMine`, `create` and `delete`, implemented twice (Supabase and in-memory), and the UI used
+exactly one of them. Two of the three destinations rendered "Not implemented yet", and tapping a
+recipe in the feed showed a snackbar saying the detail screen was not built.
+
+What changed:
+
+| Area | Before | Now |
+|---|---|---|
+| Recipe page | snackbar "not built yet" | `/feed/:id` and `/recipes/:id`: photo, description, servings / time / difficulty chips, a Private marker, author, tags, ingredients, numbered steps, delete for the author. `null` from the repository means "deleted or not yours" and the screen deliberately says neither. |
+| `/recipes` | `PlaceholderScreen` | your own recipe box via `fetchMine`, private rows included, with a New recipe action. |
+| Editor | did not exist | `/recipes/new` and `/recipes/:id/edit` share one validated form. Validation mirrors the `CHECK` constraints in migration `004` (title 1–120, servings 1–100, times 0–1440, ≤10 tags) so the database never has to refuse a submission. An edit keeps the image and `created_at` a row already has. |
+| `/profile` | `PlaceholderScreen` | identity (name, username, bio), a recipe count, and a way into the recipe box; "Not signed in" when there is no session. |
+| Sharing | the feed's tile, banner and empty/error views were private to `feed_screen.dart` | `lib/core/widgets/`: one list with the three states the spec asks for, one tile, one avatar, one demo banner. |
+| `responsive_framework` | §4.3's 🟡 item: decorative **and** wrong (its desktop band ended at 1920, so a 2560px monitor fell outside every breakpoint) | **removed**, dependency included. `responsive_shell.dart`'s two constants are the single source of truth. |
+
+New in the interface: `fetchProfile(id)` and `update(id, draft)` — the latter removes `author_id`
+and `image_url` from the update, so a recipe cannot quietly change hands and an edit cannot drop a
+photo the editor has no field for. `lib/core/session.dart` held `currentUserIdProvider`, the seam
+Phase 1b was to replace; no screen read an auth API directly.
+
+Two things this did **not** do, on purpose: **edit a profile** (`profiles_update_own` and
+`Profile.toUpdateJson` exist, but a form that cannot upload an avatar is not the form that
+ships) and **upload an image** (needs `005_storage.sql` — PR #5's territory).
+
+Evidence, in the repository's own idiom: every screen was exercised through the real provider
+graph in widget tests (`recipe_detail_test.dart`, `recipe_editor_test.dart`, `profile_test.dart`),
+the web build and the debug APK both built from this branch, and `format.log` is 0 changed.
+
+
+> **Read with §1c.** This section describes the state before the auth slice merged: the identity
+> seam was a stub in `lib/core/session.dart`, and a signed-out profile said "Not signed in". §1c
+> records what replaced both, and why.
+
+**Phase 0 is complete: run 38536020761 is green on all six jobs** — sql-expectations,
+analyze + test (28 tests, first execution ever) + format, scaffolding report, web build with
+preview publish, debug APK, log publish. Toolchain pinned by observation (not by guesswork):
+**Flutter 3.47.7 stable · Dart 3.13.5** (revision `abaf9c52`), Android Gradle Plugin 9.1.0,
+Gradle 9.3.1, Kotlin 2.4.0, Java 17.
+
+Two bugs found by reading the logs rather than guessing, both now fixed: the APK failure was
+**not** the missing `MainActivity` but a stale `AndroidManifest.xml` with no
+`flutterEmbedding = 2` marker (Flutter 3.47 refuses the deleted v1 embedding), and
+`flutter create` never corrects a file that already exists — only the pristine `vanilla/`
+app on `ci-scaffold` reveals what the current template really looks like.
+
+## 2. Method — how the analysis was produced
+
+| Check | Result |
+|---|---|
+| Repository inventory (`find`, file counts, LOC) | 23 tracked files; 615 Dart LOC (362 test), 174 SQL LOC |
+| Read every source file in full | Done — all 6 Dart files, 3 migrations, 2 docs, CI, tool script |
+| Ran the only locally-runnable check | `python3 tool/check_sql_expectations.py` → **22/22 assertions, 0 failures** |
+| Toolchain probe (`flutter`, `dart`, `supabase`, `psql`, `docker`, `java`, `gradle`) | **All absent**; node 22.22.3, npm 10.9.8, python 3.11.2, git 2.39.5, gh 2.23.0 |
+| Network probe | `api.github.com` ✅, `registry.npmjs.org` ✅, `pub.dev` ❌, `storage.googleapis.com` ❌ |
+| GitHub state (`gh`) | 3 PRs (all merged), 0 open issues, 4 branches, repo public, Actions enabled |
+| CI history | 2 runs, both `success`; **Flutter analyze + test has executed for real** |
+| CI log retrieval | ❌ blocked (`results-receiver.actions.githubusercontent.com` unreachable) |
+| Flutter-tool file expectations (13 canonical files) | **9 of 13 missing** (see §4.1) |
+
+---
+
+## 3. Inventory — what exists and what it actually does
+
+### 3.1 Application code (615 LOC)
+
+> **Snapshot of v0.2 as analysed.** `lib/screens/placeholder_screen.dart` no longer exists and
+> four of the screens below are superseded — see §1a for what replaced them.
+
+| File | LOC | State | Notes |
+|---|---|---|---|
+| `lib/main.dart` | 6 | Implemented | `runApp` only. No `WidgetsFlutterBinding`, no `Supabase.initialize`, no `ProviderScope`. |
+| `lib/app.dart` | 101 | Implemented, compiles | `MaterialApp.router`, `StatefulShellRoute.indexedStack` with 3 branches, `ResponsiveBreakpoints.builder`. |
+| `lib/navigation/responsive_shell.dart` | 118 | Implemented, compiles | Single `kNavigationDestinations` source for rail + bottom bar; correct `goBranch` re-tap semantics. |
+| `lib/screens/placeholder_screen.dart` | 28 | Implemented | "Not implemented yet". This is **all three screens**. |
+| `test/auth_test.dart` | 145 | Executed ✅ | 7 widget tests; pass in CI. |
+| `test/privacy_test.dart` | 217 | Executed ✅ | String-matching over SQL. Catches regressions, proves nothing about runtime behaviour. |
+
+### 3.2 Database (174 LOC, 3 migrations, never applied anywhere)
+
+| Migration | Contents |
+|---|---|
+| `001_initial_schema.sql` | `profiles` (id→`auth.users`, username unique, display_name, avatar_url, bio, timestamps), `recipes` (author_id NOT NULL, title, description, `ingredients jsonb`, `steps jsonb`, `is_public`), RLS enabled, 8 policies (`DROP POLICY IF EXISTS` before each). |
+| `002_indexes_and_triggers.sql` | 4 indexes, `update_updated_at()` + triggers on both tables. |
+| `003_auth_helpers.sql` | `DROP VIEW IF EXISTS public.auth_users` (leak fix), `handle_new_user()` SECURITY DEFINER signup trigger with `SET search_path = ''`, `REVOKE … FROM PUBLIC`. |
+
+Schema is coherent for a *read-another-user's-recipe* app, but holds **no social data** (no likes,
+saves, comments, follows), **no tags/search**, **no image storage bucket**, and no metadata a recipe
+app needs (servings, times, difficulty).
+
+### 3.3 Tooling & docs
+
+- `.github/workflows/ci.yml` — `sql-expectations` (python, passes) + `flutter` (pub get / analyze / test, passes). Triggers: `push` to `main` only, plus `pull_request`. **No `workflow_dispatch`, no branch pushes, no artifacts, no build step.**
+- `tool/check_sql_expectations.py` — honest stand-in for `flutter test`; now redundant in principle but useful as a 5-second guard. Keep.
+- Docs (`ARCHITECTURE.md`, `DEVELOPMENT_STATUS.md`, `supabase/README.md`) are unusually good on *reasoning* and unusually outdated on *status*. `README.md` is a single line: `# FoodCircle`.
+
+---
+
+## 4. Gap analysis, by layer
+
+Severity: 🔴 blocker · 🟠 high · 🟡 medium · ⚪ later
+
+### 4.1 Platform / build — 🔴 nothing is buildable
+
+9 of the 13 files the Flutter tool and platform toolchains require are missing:
+
+```
+analysis_options.yaml        MISSING   → flutter_lints declared in pubspec, never enabled → default lints only
+.metadata                    MISSING   → tooling can't identify project/version/migration info
+web/manifest.json (+ icons)  MISSING   → PWA metadata absent
+android/settings.gradle      MISSING   ┐
+android/build.gradle         MISSING   ├ `flutter build apk` cannot work at all
+android/gradle.properties    MISSING   │
+…MainActivity.kt             MISSING   ┘ (`AndroidManifest.xml` points at a class that doesn't exist)
+ios/Runner/Info.plist        MISSING   ┐
+ios/Runner.xcodeproj/…       MISSING   ┘ `flutter build ios` cannot work at all
+```
+
+`android/app/build.gradle` and `AndroidManifest.xml` are hand-written fragments of a real Android
+module; the iOS side is one app-icon `Contents.json`. **Consequence: the app has never run anywhere,
+on any platform, ever.** Android/iOS scaffolding must be generated by the Flutter tool itself
+(`flutter create --platforms=…`) rather than hand-written — the Xcode `project.pbxproj` is not
+something to author by hand. That generation must happen in CI, then be pulled back into the repo.
+
+### 4.2 Feedback loop — 🔴 we cannot see CI failures
+
+- Logs unreadable from the sandbox (see §1.3). A failing `flutter analyze` would give me one bit.
+- CI does not run on session branches without a PR; push-to-`arena/*` silently does nothing.
+- CI builds nothing — no web bundle, no APK — so there is no way to *look at* the app.
+- No coverage, no `dart format --set-exit-if-changed`, no pinned Flutter version
+  (`node:20` deprecation notice already fires on `actions/checkout@v4`).
+
+**This is the item that costs the most and is the cheapest to fix.** Export logs + build artifacts to
+a bot branch (`ci-artifacts`) that I can `git fetch`; then a failure is a 30-second read instead of a
+coin flip, and `python3 -m http.server` on a fetched `build/web` becomes a live preview you can click.
+
+### 4.3 Application architecture — 🔴 no layers
+
+- **No state management.** `flutter_riverpod` is a dependency with zero imports. Everything is
+  `StatefulWidget` + `MediaQuery`.
+- **No Supabase client.** `supabase_flutter` is a dependency with zero imports;
+  `Supabase.initialize()` appears nowhere; there is no config/secret plumbing (`--dart-define`, no
+  `.env.example`, no `lib/config/`).
+- **No data models, no repository layer, no error/loading states.** `Recipe` and `Profile` exist only
+  as SQL.
+- **No auth flow or route guard.** `GoRouter` has no `redirect`, no `/sign-in` or `/sign-up`, no
+  `errorBuilder`. An unauthenticated user cannot be distinguished from an authenticated one.
+- **No feature structure.** Five files total under `lib/`; no `features/`, `data/`, `core/`.
+- ✅ **Fixed 2026-10-15** — was 🟡: `ResponsiveBreakpoints.builder` was **decorative and risky**.
+  The shell read `MediaQuery.of(context).size.width` directly while the breakpoint list in
+  `app.dart` ended the desktop band at **1920**, so a 2560px monitor fell outside every breakpoint
+  it declared. The list and the dependency are gone; `responsive_shell.dart`'s two constants are
+  now the only definition. See §1a.
+- 🟡 `assets/` is declared and empty (`.gitkeep`); no images, icons, or splash configured.
+- ⚪ No dark theme, no localization setup, no a11y semantics, no analytics/crash reporting.
+
+### 4.4 Data & security — 🟠 policies are plausible, unproven, and incomplete
+
+- **No migration has ever been applied to any Postgres.** Syntax, trigger creation on `auth.users`,
+  `auth.uid()` behaviour under `SET ROLE`, and every policy are unverified.
+- Policies are asserted by *string matching* in `test/privacy_test.dart` — this catches a weakened
+  policy in review, and cannot catch a policy that is wrong when executed.
+- Missing hardening: no `CHECK` on `username` format/length, `updated_at` has no `NOT NULL`, no
+  `citext`/case-insensitive username uniqueness, no trigram or GIN index for search, `ingredients`/
+  `steps` `jsonb` unvalidated (`jsonb_typeof = 'array'` not enforced).
+- **No Supabase Storage bucket or storage policies** → image upload is impossible as designed.
+- Minor: `REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC` runs *after* `CREATE TRIGGER`;
+  on a re-run as a non-superuser, `CREATE TRIGGER` can then fail on the EXECUTE privilege check.
+  Fine on Supabase's `postgres` role, worth a comment.
+- ⚪ No `supabase/config.toml`, so `supabase start` (local dev DB) is not configured.
+
+### 4.5 Product — 🔴 there is nothing to use
+
+> **Superseded 2026-10-15:** all three destinations are real and a recipe can be written,
+> read, edited and deleted from the app — the part still missing is anything that needs an
+> account, which is Phase 1b. See §1a. What follows is the v0.2 assessment it replaced.
+
+Three destinations (`/feed`, `/recipes`, `/profile`) render "Not implemented yet". **No user can sign
+up, create a recipe, see a recipe, or edit a profile.** There is no search, no social graph, no
+notifications. The product intent ("a responsive food sharing community app") is documented in one
+sentence; the "approved v0.2 prototype / development handoff" referenced throughout the docs has now
+been missing across **three consecutive sessions** — treat the spec as *not existing* and write one.
+
+### 4.6 Docs / process / hygiene — 🟡
+
+- `README.md` is one line — no setup, no run instructions, no env var contract.
+- Status docs assert "nothing has been compiled", now false (CI is green).
+- No `LICENSE` on a public repo; no issue templates, no `CODEOWNERS`, no PR template, no CHANGELOG.
+- No release/versioning story (version pinned at `0.2.0+1` since the first PR).
+
+---
+
+## 5. Constraints that shape the plan
+
+| # | Constraint | Consequence |
+|---|---|---|
+| C1 | No Flutter/Dart SDK locally, and it cannot be installed (pub.dev + Google storage unreachable) | All compilation, testing and building happens in CI. Code must be written "blind" and validated in small batches. |
+| C2 | CI job logs are unreachable from the sandbox | CI must export its own logs/artifacts into a branch. **Blocker for everything else.** |
+| C3 | GitHub Actions is free here (public repo) and has a 6-hour job limit | Mobile + web builds are feasible in CI. |
+| C4 | No product spec, no prototype, no designs | We must write a one-page spec and get explicit sign-off before Phase 2, or accept inferred scope. |
+| C5 | No Supabase project / credentials available | Auth and storage work can be written and unit-tested with fakes, but end-to-end verification needs a project (free tier) or a local stack. |
+| C6 | Real Postgres is only available via CI service containers (no docker/psql locally) | RLS behaviour tests must run in CI. This is achievable and is the honest version of `privacy_test.dart`. |
+
+---
+
+## 6. Target architecture
+
+```
+lib/
+  main.dart                     # ensureInitialized → Supabase.initialize(env) → runApp(ProviderScope)
+  app.dart                      # MaterialApp.router + theme + router provider
+  core/
+    config/env.dart             # String.fromEnvironment, fails loudly when unset
+    router/app_router.dart      # GoRouter + auth redirect guard + errorBuilder
+    theme/app_theme.dart        # light/dark, design tokens
+    widgets/                    # AsyncValueView, EmptyState, ErrorRetry, skeletons
+  features/
+    auth/         data/ domain/ presentation/     # controller + sign-in/sign-up screens
+    feed/         data/ domain/ presentation/
+    recipes/      data/ domain/ presentation/     # list, detail, editor
+    profile/      data/ domain/ presentation/
+  data/
+    models/                     # Profile, Recipe, Comment (+ fromJson/toJson/copyWith)
+    repositories/               # abstract + Supabase impl + in-memory fake
+  navigation/responsive_shell.dart   # unchanged in spirit
+supabase/
+  config.toml                   # local dev stack
+  migrations/004_…  005_…       # append-only from here on
+  tests/                        # SQL behaviour tests (RLS) run in CI
+```
+
+**Rules going forward:** migrations become append-only the moment they are applied anywhere; every
+feature gets a repository interface with a fake implementation (so widget tests stay hermetic and the
+web preview can run on seed data); no PII or `service_role` key in the repo.
+
+---
+
+## 7. Roadmap
+
+### Phase 0 — Make the loop real 🔴 *prerequisite for all other work* (size: M)
+
+| # | Task | Why | Done when |
+|---|---|---|---|
+| P0.1 | CI exports logs + artifacts to a `ci-artifacts` bot branch; add `workflow_dispatch`, run on all branches; `checkout@v5` | The sandbox cannot read job logs; without this, failures are unguessable | I `git fetch origin ci-artifacts` and read `analyze.log` / `test.log` / `build-web.log` for any run |
+| P0.2 | Add `flutter build web --release` job publishing to a `preview` branch | Gives a **clickable live preview** of the real app in this environment | The web bundle is servable from the sandbox and renders the nav shell |
+| P0.3 | Add `flutter build apk --debug` job (artifact only) | Proves the mobile target actually builds | APK produced, build time recorded |
+| P0.4 | Generate platform scaffolding via `flutter create --platforms=android,ios,web .` **in CI**, commit the result back | 9 required files are missing; pbxproj can't be hand-written | `android/`+`ios/`+`web/` complete and a debug APK builds |
+| P0.5 | Add `analysis_options.yaml` with `flutter_lints`, fix resulting lints, add `dart format --set-exit-if-changed` | Lints are currently off; `flutter_lints` is a dead dependency | CI green with lints enabled |
+| P0.6 | README + status docs rewritten to match reality (incl. this roadmap) | Docs claim the opposite of the truth about CI | New contributor can run everything from the README |
+
+**Exit criteria for Phase 0:** green CI that runs analyze + test + web build + APK build + SQL
+behaviour tests; readable logs; a live preview URL of the running app; docs accurate.
+
+### Phase 0.5 — Prove the database ✅ (size: S, runs inside CI)
+
+**Done, and it earned its keep on the first two runs.**
+
+- `supabase/tests/00_auth_stub.sql` recreates the Supabase-managed surface (`auth.users`,
+  `auth.uid()`, the three client roles, and the default privileges that give `anon` and
+  `authenticated` full access to `public` — so RLS really is the only thing being tested).
+- `supabase/tests/10_rls_behaviour.sql` makes 21 behavioural assertions as `anon`,
+  `authenticated` (with a JWT `sub`) and `service_role`: who can read a private recipe, who can
+  insert on whose behalf, whether updates and deletes correctly affect zero rows, whether the
+  signup trigger provisions exactly one profile, survives a duplicate username, and whether
+  account deletion cascades.
+- `supabase/tests/run.sh` applies stub → migrations → suite to any PostgreSQL. CI runs it in the
+  `db-behaviour` job; the same file also runs locally under PGlite (see below).
+- Found and fixed a real problem: the migrations required the **`uuid-ossp` extension** for a
+  UUID default that core PostgreSQL has provided since 13. Removed.
+- `test/privacy_test.dart` stays as the fast static guard; it is no longer the *only* evidence.
+- PGlite (PostgreSQL compiled to WebAssembly, published on npm) gave this sandbox a real
+  PostgreSQL to test against, so the suite was verified before it was pushed rather than
+  debugged through CI — twice, because the first version silently depended on whether the
+  runner sends each statement in its own transaction (`psql`) or the whole file in one.
+
+### Phase 1 — Data & auth foundation (size: M–L) · 1a/1b/1c verified; upload API follow-up
+
+**Phase 1a is verified in CI:** migration `004` adds recipe metadata and converts the ingredient
+and step lists with a legacy-data upgrade test. The app has `Env`, forgiving `Recipe`/`Profile`
+models, Supabase and in-memory repositories, Riverpod wiring, and a real public feed with loading,
+empty, error and refresh states.
+
+**Phase 1b/1c were reconstructed from inferred repository docs, not from the missing handoff:**
+
+- `AuthRepository` has Supabase and ephemeral in-memory implementations. The Supabase adapter uses
+  email/password sign-in, sends the username to the existing profile-provisioning trigger, and
+  relies on `supabase_flutter` for session persistence. The demo fake stores no password and is not
+  real authentication.
+- `/feed` is public; `/recipes` and `/profile` are guarded. Sign-in, sign-up and sign-out paths use
+  a same-app return target; the current Profile screen is only an account/sign-out surface.
+- `005_storage.sql` creates an inferred public `recipe-images` bucket. Reads are public; inserts,
+  updates and deletes must remain under the caller's UUID folder. A 10 MiB limit and JPEG/PNG/WebP
+  allowlist are provisional and must be reconciled with the handoff before deployment.
+- With explicit authorization for this provisional follow-up, `RecipeRepository.uploadImage`
+  accepts bytes plus MIME type, validates the current inferred size/format limits, derives a unique
+  object name, places it under the current Supabase auth user's folder, disables overwrite, and
+  returns the public URL. The in-memory demo refuses uploads rather than pretending to persist them.
+- Static policy assertions and PostgreSQL behavior tests verified the Storage policies in CI run
+  `38560095418`; the repository upload adapter is a follow-up change covered by the current branch's
+  CI. No Supabase project is used or created. Migration `005` has not been deployed and remains
+  rewritable.
+
+No editor or recipe-screen integration, resizing, upload progress/retry, cleanup, or avatar upload is
+included. Reconcile the inferred bucket rules before deployment; keep the rest of Phase 2 behind the
+handoff review and explicit sign-off.
+
+### Phase 2 — The actual product: Feed, Recipes, Profile (size: L)
+
+**Status (2026-10-15): the screens exist, and search with them; the gate below was not met.**
+Feed, recipe detail, the editor (minus images) and the profile are built and tested — see §1a —
+and search by title, ingredient and tag landed in §1b. The editor still has no image field,
+because uploads need `005_storage.sql` (PR #5). What is worth restating is
+the gate: these screens encode the inferences in `PRODUCT_SPEC.md`, so they are cheap to change
+now and expensive to change after Phase 3 builds on them.
+
+- Feed: public recipes, paginated (keyset on `created_at,id`), pull-to-refresh, author chips,
+  loading/empty/error states.
+- Recipe detail: image, ingredients, steps, author card, edit/delete for the owner.
+- Recipe editor: create/edit/delete with validation, image upload to Storage with progress + retry.
+- Profile: view + edit own profile, avatar upload, "my recipes".
+- Search & filters: title/ingredient/tag, sort by newest/popular.
+- **Gate: one-page product spec signed off (C4)** — otherwise these screens encode guesses.
+
+### Phase 3 — Social & retention (size: L)
+
+- Likes, saves/favourites, comments (`006_social.sql` + policies + tests).
+- The "circle" concept from the product name: follow/circle graph + a circle-scoped feed.
+- Realtime via Supabase channels for comments/likes; notification inbox.
+- Reporting/moderation basics (public app → required before any real launch).
+
+### Phase 4 — Polish & release (size: M)
+
+Dark theme, a11y semantics + text-scaling, i18n decision (decide *before* Phase 2 strings multiply),
+launcher icons/splash, image caching, error reporting, release signing config, store metadata,
+`LICENSE`, PR/issue templates, `CHANGELOG`, versioning (`0.3.0+2` onward).
+
+### Deferred / explicit non-goals for now
+
+Offline-first sync, iOS release pipeline (needs an Apple developer account), native
+push notifications, payments, multi-language content, Docker-based local Supabase.
+
+---
+
+## 8. Risk register
+
+| # | Risk | Impact | Mitigation |
+|---|---|---|---|
+| R1 | **No product spec** — three sessions have looked for the v0.2 handoff and not found it | We build the wrong product, expensively | Write a 1-page spec in Phase 1; sign off before Phase 2 code |
+| R2 | **Blind development** — no local compiler | Slow, guessy debugging; broken main | Phase 0 log/artifact export, small commits, CI on every push |
+| R3 | Regenerating platform scaffolding overwrites something | Lost work | Nothing custom exists yet (only a manifest + gradle fragment) → safest moment is now |
+| R4 | RLS policies wrong in a way string-matching can't see | Data leak on a public app | Phase 0.5 behavioural SQL tests; re-run after every policy change |
+| R5 | Credentials mishandled (service_role committed) | Full DB compromise | Anon key only, via `--dart-define`; document in README; add a CI secret-scan step |
+| R6 | No Supabase project available (C5) | Auth/storage can't be verified end-to-end | Build behind repository interfaces with fakes; verify when a project exists |
+| R7 | Flutter/Dart version drift (`channel: stable`, unpinned) | Green today, red tomorrow with no code change | Pin a Flutter version in CI; bump deliberately |
+| R8 | Scope sprawl across social features | Nothing ships | Phases are strictly ordered; Phase 2 must be usable end-to-end before Phase 3 starts |
+
+---
+
+## 8a. Handoff documents
+
+The handoff (documents `01`–`11`) was provided on 2026-10-14 but **did not arrive in the
+sandbox** — see [`handoff/README.md`](handoff/README.md) for how to get it here, and note the
+numbering gap: there is no `02`.
+
+Until it arrives, everything product-facing in this repository is *inferred*.
+[`handoff/RECONCILIATION.md`](handoff/RECONCILIATION.md) is the inventory of every assumption that
+is currently baked into code, migrations or tests, mapped to the document that settles it — so the
+reconciliation is one pass rather than a re-read of the codebase. The most consequential unknowns
+are marked there, and they are large: **location, notifications and offline behaviour appear
+nowhere in the current implementation**, while the handoff devotes a document to each.
+
+## 9. Decisions I need from you
+
+1. **Spec** — do you have the v0.2 prototype / handoff / any notes on what FoodCircle should *do*
+   (screens, flows, who the users are)? If not, I'll write a one-page spec and you approve it.
+2. **Verification target** — is a live **web preview** in this environment the fastest way for you to
+   see progress, or do you care about an installable **Android APK** first?
+3. **Supabase** — is there an existing project I should target (you can paste the project URL; the
+   anon key is public-safe), or should everything stay fake-backed until you create one?
+4. **Product scope for the next milestone** — minimum lovable product (auth + create/view recipes +
+   profile), or should social features (likes, comments, circle/follow) land in the same push?
+
+---
+
+## 10. Immediate next actions (Phase 0, in order)
+
+1. `ci-artifacts` log/artifact exporter + `workflow_dispatch` + all-branch triggers. *(Unblocks R2.)*
+2. `flutter build web` → `preview` branch → serve it here → first screenshot of the app ever.
+3. `flutter create` scaffolding regeneration → commit → `flutter build apk --debug` in CI.
+4. `analysis_options.yaml` + lints + `dart format` gate.
+5. Postgres-behaviour SQL test job (Phase 0.5).
+6. Docs rewrite (README, `ARCHITECTURE.md` status, `DEVELOPMENT_STATUS.md` banner).
+
+Everything above is verifiable from this sandbox — no credentials, no local SDK, no new services.
