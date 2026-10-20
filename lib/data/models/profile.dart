@@ -32,12 +32,6 @@ class Profile {
   String get name =>
       displayName?.trim().isNotEmpty ?? false ? displayName!.trim() : username;
 
-  Map<String, dynamic> toUpdateJson() => {
-        'display_name': displayName,
-        'avatar_url': avatarUrl,
-        'bio': bio,
-      };
-
   Profile copyWith({
     String? username,
     String? displayName,
@@ -51,4 +45,37 @@ class Profile {
         avatarUrl: avatarUrl ?? this.avatarUrl,
         bio: bio ?? this.bio,
       );
+}
+
+/// The fields a profile owner can change: the write side of [Profile].
+///
+/// A draft, not a [Profile], because a profile cannot be *created* from the app — the signup
+/// trigger owns that — and because the two are not the same shape. This deliberately carries no
+/// avatar: there is no field for one and no bucket for one, and `avatar_url` on a write would
+/// null the column for anyone who already has an avatar. That is why [toUpdateJson] exists here
+/// rather than on [Profile], which used to have a write payload that did exactly that.
+@immutable
+class ProfileDraft {
+  const ProfileDraft({
+    required this.id,
+    required this.username,
+    this.displayName,
+    this.bio,
+  });
+
+  /// Whose row. The update policy (`profiles_update_own`) requires this to be the caller.
+  final String id;
+
+  /// Required and unique in the table. Taken names are refused by the database, and the
+  /// repository turns that refusal into a message a person can act on.
+  final String username;
+
+  final String? displayName;
+  final String? bio;
+
+  Map<String, dynamic> toUpdateJson() => {
+        'username': username,
+        'display_name': displayName,
+        'bio': bio,
+      };
 }

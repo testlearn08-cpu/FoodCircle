@@ -67,8 +67,47 @@ to.
 | Phase 1a Data layer + real Feed | ✅ done | migration 004 (metadata, tags, jsonb→text[]) with an upgrade-path test; `Env` + `--dart-define`; models, repositories (Supabase + in-memory), Riverpod providers; `/feed` is a real screen. 42 tests, green run 38539309676 |
 | Phase 2a Product surface: recipe page, recipe box, editor, profile | ✅ done | every destination is real and a recipe can be written from the app; green run [38685862019](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38685862019) |
 | Phase 2b Search: title + ingredient text, tag filter | ✅ done | migration 006 + 7 behavioural checks; 75 tests, green run [38737252443](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38737252443) |
+| Phase 2c Profile editing: display name, username, bio | ✅ done | green run [38874039571](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38874039571) — 111 tests, 33 database checks |
 | Phase 1b Auth (screens, session, route guard) | ✅ done, merged | Supabase adapter + ephemeral fake, `/sign-in`, `/sign-up`, auth-state redirect refresh, sign-out. Verified by PR #5's green run `38560095418`; merged into `main` as `db33dd3`, then integrated here (§1c). |
 | Phase 1c Migration 005 storage bucket + policies | ✅ done, merged | inferred public `recipe-images` bucket, reads public and writes confined to the authenticated user's UUID folder, plus the repository upload adapter. Not deployed and still rewritable. |
+
+---
+
+## 1d. Update — 2026-10-16 (later): the profile you can edit
+
+**Green run [38874039571](https://github.com/testlearn08-cpu/FoodCircle/actions/runs/38874039571), 111 tests, 33 database checks.**
+
+The last deliberate gap on the product surface. `profiles` has had `profiles_update_own` since
+migration 001, `Profile` has had a write payload since the data layer landed, and nothing called
+either — so a username typo at signup was permanent, and the bio the profile page showed could
+not be written from anywhere.
+
+| Decision | Why |
+|---|---|
+| The write payload moves to a new `ProfileDraft`, and `Profile`'s is deleted | `Profile.toUpdateJson()` wrote `avatar_url`, so any caller would have nulled the avatar of everyone who has one. A draft that cannot carry an avatar cannot destroy one — and the in-memory adapter now preserves the column explicitly, so the demo build agrees. |
+| Usernames get a message: `ProfileUpdateFailure('That username is taken.')`, from SQLSTATE 23505 | It is the one refusal a person can fix by typing something else, and therefore the one the form owes an explanation for. Behavioural check 33 asserts the state the client matches on is the one Postgres actually raises, so the message cannot silently become unreachable. |
+| Signup still cannot hit it | `handle_new_user` falls back to `user_<id>` for a taken name (check 4). Worth stating because it is why check 33 has to update a profile to provoke a 23505 at all. |
+| The editor's limits (username 1–30, display name ≤80, bio ≤2000) are the client's own | Migration 001 declares `username TEXT UNIQUE NOT NULL` and nothing else about these columns: there is no CHECK to mirror, so the numbers are inferences, not rules. |
+| A save invalidates the feed and the recipe box, not just the profile | `_withAuthors` copies the author's name onto every recipe read, so a renamed author is stale everywhere their name appears. |
+| The avatar is still not editable, and the screen does not offer a field for it | 005's bucket is recipe images; there is no bucket for avatars, and an upload to a nonexistent bucket fails on the device of whoever taps it first. |
+
+The screen also has a state the routes did not have before: a profile row that does not exist is
+not something to edit, so `EditProfileScreen` says so instead of presenting a form that could not
+save. The route is `/profile/edit`, inside the shell's profile branch, and the guard that covers
+`/profile/**` covers it — a signed-out visitor is sent to sign in rather than handed an editor.
+
+Local evidence before the push, in the order it was produced: 33/33 behavioural checks on
+PostgreSQL 18.6 (PGlite), 11/11 Dart static guardrails (three of them new, pinning the draft's
+payload, the avatar-preserving write and the 23505 translation), 35 SQL-expectation assertions
+with 5 scoped to one migration — and a bracket/imports/implements pre-check over all 44 Dart
+files, which is what caught `test/feed_test.dart`'s fake repository missing the new interface
+member before CI would have.
+
+Two CI iterations were needed, both recorded because both are the kind of thing this repository
+keeps happening: the first test asserted `find.text('Ana')` inside the editor and found the
+field's own hint as well as its content (a form's hints are the demo profile's values), and four
+hand-wrapped lines failed the format gate because the stable formatter keeps a line inline when it
+fits in 80 columns. Both fixes are in `b29b972` and `1b92891`.
 
 ---
 

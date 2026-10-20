@@ -72,6 +72,10 @@ no AI/semantic search.
 **S6 · Profile** — avatar, display name, bio, "my recipes", "saved". Editing your own profile
 (including avatar upload) is the only write action here.
 
+> **Built (2026-10-16):** display name, username and bio are editable at `/profile/edit`; "my
+> recipes" is `/recipes`. Still absent: the avatar (needs its own bucket and policies), and
+> "saved" — saving somebody else's recipe is a whole subsystem this spec's `03`/`04` still owe.
+
 **S7 · Settings** *(thin)* — sign out, delete account. **[assumption]** delete account ships in v0.3
 because an app that stores user content without it is not shippable.
 

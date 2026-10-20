@@ -144,6 +144,43 @@ class InMemoryRecipeRepository implements RecipeRepository {
   }
 
   @override
+  Future<Profile> updateProfile(ProfileDraft draft) async {
+    final Profile? existing = _profiles[draft.id];
+    if (existing == null) {
+      throw StateError('No profile row for ${draft.id} to update.');
+    }
+    if (currentUserId == null || draft.id != currentUserId) {
+      throw StateError(
+        'Signed-out or not the owner: the update policy would reject a write '
+        'to ${draft.id}\'s profile.',
+      );
+    }
+
+    // `username` is UNIQUE NOT NULL in migration 001, which is the constraint the real client
+    // gets a 23505 from; this is the same refusal, raised at the same point in the flow, so the
+    // screen's handling of it is exercised by the demo build too.
+    final bool taken = _profiles.values.any(
+      (profile) => profile.id != draft.id && profile.username == draft.username,
+    );
+    if (taken) {
+      throw const ProfileUpdateFailure('That username is taken.');
+    }
+
+    final Profile updated = Profile(
+      id: existing.id,
+      username: draft.username,
+      displayName: draft.displayName,
+      // Kept, not overwritten: this editor has no avatar field, and dropping the column because
+      // the form does not mention it is the one way a profile edit can destroy data.
+      avatarUrl: existing.avatarUrl,
+      bio: draft.bio,
+    );
+
+    _profiles[updated.id] = updated;
+    return updated;
+  }
+
+  @override
   Future<Recipe?> fetchById(String id) async {
     for (final recipe in _recipes) {
       if (recipe.id == id &&
