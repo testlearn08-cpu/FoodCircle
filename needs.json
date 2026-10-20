@@ -1,0 +1,34 @@
+{
+  "secrets": {
+    "result": "success",
+    "outputs": {}
+  },
+  "dart-static": {
+    "result": "success",
+    "outputs": {}
+  },
+  "sql-expectations": {
+    "result": "success",
+    "outputs": {}
+  },
+  "db-behaviour": {
+    "result": "success",
+    "outputs": {}
+  },
+  "flutter": {
+    "result": "success",
+    "outputs": {}
+  },
+  "scaffold": {
+    "result": "success",
+    "outputs": {}
+  },
+  "build-web": {
+    "result": "success",
+    "outputs": {}
+  },
+  "build-apk": {
+    "result": "success",
+    "outputs": {}
+  }
+}

@@ -1,0 +1,21 @@
+### Files present in the generated tree but not in the repo
+ADDED : .flutter-plugins-dependencies
+ADDED : .idea
+ADDED /android/app/src/main: java
+ADDED /android/app/src/main/kotlin/com/foodcircle: foodcircle
+ADDED /android: foodcircle_android.iml
+ADDED /android/gradle/wrapper: gradle-wrapper.jar
+ADDED /android: gradlew
+ADDED /android: gradlew.bat
+ADDED /android: local.properties
+ADDED : foodcircle.iml
+ADDED /ios/Flutter: Generated.xcconfig
+ADDED /ios/Flutter: ephemeral
+ADDED /ios/Flutter: flutter_export_environment.sh
+ADDED /ios/Runner: GeneratedPluginRegistrant.h
+ADDED /ios/Runner: GeneratedPluginRegistrant.m
+ADDED /ios/Runner.xcodeproj: project.xcworkspace
+ADDED /ios: Runner.xcworkspace
+
+### Files that differ from the repo
+Files /home/runner/work/FoodCircle/FoodCircle/pubspec.lock and <generated>/pubspec.lock differ

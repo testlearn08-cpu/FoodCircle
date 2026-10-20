@@ -1,0 +1,30 @@
+  ok  'alter table public.profiles enable row level security' -> 001_initial_schema.sql
+  ok  'alter table public.recipes enable row level security' -> 001_initial_schema.sql
+  ok  'username text unique not null' -> 001_initial_schema.sql
+  ok  'create policy "profiles_read_all" on public.profiles for select using (t' -> 001_initial_schema.sql
+  ok  'create policy "profiles_insert_own" on public.profiles for insert with c' -> 001_initial_schema.sql
+  ok  'create policy "profiles_update_own" on public.profiles for update using ' -> 001_initial_schema.sql
+  ok  'create policy "profiles_delete_own" on public.profiles for delete using ' -> 001_initial_schema.sql
+  ok  'create policy "recipes_read_public" on public.recipes for select using (' -> 001_initial_schema.sql
+  ok  'create policy "recipes_insert_own" on public.recipes for insert with che' -> 001_initial_schema.sql
+  ok  'create policy "recipes_update_own" on public.recipes for update using (a' -> 001_initial_schema.sql
+  ok  'create policy "recipes_delete_own" on public.recipes for delete using (a' -> 001_initial_schema.sql
+  ok  'author_id uuid not null references auth.users' -> 001_initial_schema.sql
+  ok  'drop view if exists public.auth_users' -> 003_auth_helpers.sql
+  ok  'create or replace function public.handle_new_user()' -> 003_auth_helpers.sql
+  ok  'security definer' -> 003_auth_helpers.sql
+  ok  "set search_path = ''" -> 003_auth_helpers.sql, 006_recipe_search.sql
+  ok  'after insert on auth.users for each row execute function public.handle_n' -> 003_auth_helpers.sql
+  ok  'revoke all on function public.handle_new_user() from public' -> 003_auth_helpers.sql
+  ok  'security invoker' -> 006_recipe_search.sql
+  ok  "set search_path = ''" -> 003_auth_helpers.sql, 006_recipe_search.sql
+  ok  'create index if not exists idx_recipes_author on public.recipes(author_i' -> 002_indexes_and_triggers.sql
+  ok  'create trigger update_profiles_updated_at before update on public.profil' -> 002_indexes_and_triggers.sql
+  ok  'create trigger update_recipes_updated_at before update on public.recipes' -> 002_indexes_and_triggers.sql
+  ok  "values ( 'recipe-images', 'recipe-images', true, 10485760, array['image/" -> 005_storage.sql
+  ok  'create policy recipe_images_read_public on storage.objects for select to' -> 005_storage.sql
+  ok  'create policy recipe_images_insert_own on storage.objects for insert to ' -> 005_storage.sql
+  ok  'create policy recipe_images_update_own on storage.objects for update to ' -> 005_storage.sql
+  ok  'create policy recipe_images_delete_own on storage.objects for delete to ' -> 005_storage.sql
+
+assertions checked: 35 (5 scoped to one migration), failures: 0

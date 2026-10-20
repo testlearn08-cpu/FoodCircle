@@ -1,0 +1,132 @@
+Resolving dependencies...
+Downloading packages...
+  cupertino_icons 1.0.9 (2.0.0 available)
+  flutter_lints 4.0.0 (6.0.0 available)
+  flutter_riverpod 2.6.1 (3.4.3 available)
+  go_router 14.8.1 (18.1.0 available)
+  lints 4.0.0 (6.1.0 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  riverpod 2.6.1 (3.4.3 available)
+  shared_preferences_android 2.4.28 (2.5.1 available)
+  shared_preferences_foundation 2.5.7 (2.6.0 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.3 available)
+  vm_service 15.3.0 (15.4.0 available)
+Got dependencies!
+13 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart
+00:00 +0: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: Recipe.fromJson parses a full PostgREST row
+00:00 +1: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: Recipe.fromJson tolerates the shapes PostgreSQL actually returns
+00:00 +2: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: Profile falls back to the username when there is no display name
+00:00 +3: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: InMemoryRecipeRepository the feed is newest first
+00:00 +4: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: InMemoryRecipeRepository a private recipe is visible to its author and nobody else
+00:00 +5: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: InMemoryRecipeRepository fetchMine returns only that author, newest first
+00:00 +6: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: InMemoryRecipeRepository keyset pagination never repeats a recipe
+00:00 +7: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: InMemoryRecipeRepository create refuses to write a recipe attributed to someone else
+00:00 +8: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: InMemoryRecipeRepository create then delete round-trips
+00:00 +9: /home/runner/work/FoodCircle/FoodCircle/test/recipe_test.dart: InMemoryRecipeRepository fetchById on someone else's private recipe looks like it does not exist
+00:01 +10: /home/runner/work/FoodCircle/FoodCircle/test/recipe_detail_test.dart: a recipe page shows what you need to cook it
+00:02 +11: /home/runner/work/FoodCircle/FoodCircle/test/recipe_detail_test.dart: a recipe page shows what you need to cook it
+00:02 +12: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation a protected destination returns to the sign-in page
+00:03 +13: /home/runner/work/FoodCircle/FoodCircle/test/recipe_detail_test.dart: the author can delete their own recipe, from its page
+00:03 +14: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-up returns to the protected destination and sign-out works
+00:03 +15: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-up returns to the protected destination and sign-out works
+00:03 +16: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-up returns to the protected destination and sign-out works
+00:03 +17: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +18: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +19: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +20: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +21: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +22: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +23: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +24: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +25: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +26: /home/runner/work/FoodCircle/FoodCircle/test/auth_flow_test.dart: auth-gated navigation sign-in restores the protected destination
+00:04 +27: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: recipes policies update restricted to the author
+00:04 +28: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: recipes policies delete restricted to the author
+00:04 +29: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: schema integrity a recipe always has an author
+00:04 +30: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: auth helpers do not leak auth.users 001_initial_schema.sql creates no view
+00:04 +31: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: auth helpers do not leak auth.users 002_indexes_and_triggers.sql creates no view
+00:04 +32: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: auth helpers do not leak auth.users 003_auth_helpers.sql creates no view
+00:04 +33: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: auth helpers do not leak auth.users the old auth_users view is dropped, not recreated
+00:04 +34: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: auth helpers do not leak auth.users the signup trigger runs as a hardened SECURITY DEFINER function
+00:04 +35: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: auth helpers do not leak auth.users the signup trigger is attached to auth.users
+00:04 +36: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: auth helpers do not leak auth.users clients cannot call the SECURITY DEFINER function directly
+00:04 +37: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: search is not a second authorization boundary runs as the caller, so the policies decide what it returns
+00:04 +38: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: search is not a second authorization boundary creates no view
+00:04 +39: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: indexes and triggers the author foreign key is indexed
+00:04 +40: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: indexes and triggers updated_at is maintained by a trigger on profiles
+00:04 +41: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: indexes and triggers updated_at is maintained by a trigger on recipes
+00:04 +42: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: recipe image storage policies bucket is public and limited to supported image uploads
+00:04 +43: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: recipe image storage policies public clients can read recipe images
+00:04 +44: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: recipe image storage policies uploads are restricted to the signed-in user folder
+00:04 +45: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: recipe image storage policies updates cannot move an image outside the owner folder
+00:04 +46: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: recipe image storage policies deletes are restricted to the signed-in user folder
+00:04 +47: /home/runner/work/FoodCircle/FoodCircle/test/privacy_test.dart: (tearDownAll)
+00:04 +47: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: matches the title, case-insensitively
+00:04 +48: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: matches inside the ingredient list, not just the title
+00:04 +49: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: a blank query is no filter at all
+00:04 +50: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: filters by tag, exactly
+00:04 +51: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: a query and a tag narrow together
+00:04 +52: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: search cannot see past the visibility rule
+00:04 +53: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: % and _ are literal text, not wildcards
+00:04 +54: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: before paginates a search the way it paginates the feed
+00:04 +55: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: limit is honoured, and results stay newest-first
+00:04 +56: /home/runner/work/FoodCircle/FoodCircle/test/recipe_search_test.dart: the tag chips cover every tag in the feed, without duplicates
+00:04 +57: /home/runner/work/FoodCircle/FoodCircle/test/feed_search_test.dart: typing filters the feed to matching recipes
+00:06 +58: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor opens with what the profile already says
+00:06 +59: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor opens with what the profile already says
+00:06 +60: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor opens with what the profile already says
+00:06 +61: /home/runner/work/FoodCircle/FoodCircle/test/feed_search_test.dart: a search with no results offers a way out
+00:06 +62: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor saving takes you back to the profile it changed
+00:07 +63: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor saving takes you back to the profile it changed
+00:07 +64: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor saving takes you back to the profile it changed
+00:07 +65: /home/runner/work/FoodCircle/FoodCircle/test/feed_search_test.dart: a tag and a text query narrow together
+00:07 +66: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor clearing a field clears it rather than storing blank text
+00:07 +67: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor clearing a field clears it rather than storing blank text
+00:08 +68: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor a username somebody else has is refused, in words
+00:08 +69: /home/runner/work/FoodCircle/FoodCircle/test/profile_edit_test.dart: the editor an empty username is refused before anything is sent
+00:08 +70: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:09 +71: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:09 +72: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:09 +73: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:09 +74: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:09 +75: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:09 +76: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:09 +77: /home/runner/work/FoodCircle/FoodCircle/test/recipe_editor_test.dart: a filled-in form creates a recipe and opens it
+00:11 +78: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell builds and lands on the Feed destination
+00:11 +79: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell builds and lands on the Feed destination
+00:11 +80: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell builds and lands on the Feed destination
+00:11 +81: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell builds and lands on the Feed destination
+00:11 +82: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell builds and lands on the Feed destination
+00:11 +83: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell builds and lands on the Feed destination
+00:11 +84: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell desktop width renders an extended rail and no bottom bar
+00:11 +85: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell tablet width renders a compact rail
+00:11 +86: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell mobile width renders bottom navigation and no rail
+00:12 +87: /home/runner/work/FoodCircle/FoodCircle/test/auth_test.dart: FoodCircle application shell selecting a rail destination swaps the body but keeps the shell
+00:12 +88: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: renders recipes from the repository
+00:12 +89: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: renders recipes from the repository
+00:12 +90: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: renders recipes from the repository
+00:13 +91: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: renders recipes from the repository
+00:13 +92: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: renders recipes from the repository
+00:13 +93: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: renders recipes from the repository
+00:13 +94: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: says it is a demo when no project is configured
+00:13 +95: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: shows an empty state rather than an empty list
+00:13 +96: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: shows the failure and offers a retry that retries
+00:13 +97: /home/runner/work/FoodCircle/FoodCircle/test/feed_test.dart: shows the failure and offers a retry that retries
+00:13 +98: /home/runner/work/FoodCircle/FoodCircle/test/recipe_image_upload_test.dart: RecipeImageUpload accepts only the provisional JPEG, PNG, and WebP allowlist
+00:13 +99: /home/runner/work/FoodCircle/FoodCircle/test/recipe_image_upload_test.dart: RecipeImageUpload copies bytes so callers cannot mutate a validated upload
+00:13 +100: /home/runner/work/FoodCircle/FoodCircle/test/recipe_image_upload_test.dart: RecipeImageUpload rejects empty and over-limit payloads
+00:13 +101: /home/runner/work/FoodCircle/FoodCircle/test/recipe_image_upload_test.dart: RecipeImageUpload allows a payload exactly at the inferred 10 MiB limit
+00:13 +102: /home/runner/work/FoodCircle/FoodCircle/test/recipe_image_upload_test.dart: in-memory demo refuses to pretend it has persisted an image
+00:14 +103: /home/runner/work/FoodCircle/FoodCircle/test/auth_repository_test.dart: InMemoryAuthRepository sign-up creates an ephemeral user and emits the session
+00:14 +104: /home/runner/work/FoodCircle/FoodCircle/test/auth_repository_test.dart: InMemoryAuthRepository sign-in and sign-out publish the current identity
+00:14 +105: /home/runner/work/FoodCircle/FoodCircle/test/auth_repository_test.dart: InMemoryAuthRepository rejects empty credentials rather than creating a signed-in state
+00:14 +106: /home/runner/work/FoodCircle/FoodCircle/test/auth_repository_test.dart: InMemoryAuthRepository rejects sign-up without a username
+00:14 +107: /home/runner/work/FoodCircle/FoodCircle/test/profile_test.dart: the profile shows who you are and how much you have cooked
+00:15 +108: /home/runner/work/FoodCircle/FoodCircle/test/profile_test.dart: the profile leads into the recipe box
+00:16 +109: /home/runner/work/FoodCircle/FoodCircle/test/profile_test.dart: with no account the profile destination asks you to sign in
+00:16 +110: /home/runner/work/FoodCircle/FoodCircle/test/profile_test.dart: with no account the recipe box asks you to sign in as well
+00:16 +111: All tests passed!
